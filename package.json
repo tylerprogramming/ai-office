@@ -1,0 +1,19 @@
+{
+  "name": "ai-office",
+  "version": "2.0.0",
+  "description": "AI Agent Office Simulation",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "form-data": "^4.0.5",
+    "multer": "^2.1.1"
+  }
+}
