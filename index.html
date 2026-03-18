@@ -1,0 +1,1993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Agent Office</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a18;
+      color: #e0e0e0;
+      font-family: 'Courier New', monospace;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── HEADER ── */
+    #header {
+      display: flex;
+      align-items: center;
+      padding: 6px 16px;
+      background: #12122a;
+      border-bottom: 1px solid #2a2a5a;
+      gap: 10px;
+      flex-shrink: 0;
+      min-height: 44px;
+    }
+    #title {
+      font-size: 13px;
+      font-weight: bold;
+      color: #8888ff;
+      letter-spacing: 3px;
+      white-space: nowrap;
+    }
+    #agent-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+    .agent-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: #1e1e3a;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: 11px;
+      border: 1px solid #2a2a5a;
+    }
+    .agent-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    #event-badge {
+      margin-left: auto;
+      background: #2a2a5a;
+      border: 1px solid #5555aa;
+      padding: 3px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      color: #aaaaff;
+      display: none;
+    }
+    #event-badge.show { display: block; }
+
+    /* ── MAIN LAYOUT ── */
+    #main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── CANVAS AREA ── */
+    #canvas-wrap {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: #0a0a18;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    canvas { display: block; }
+
+    /* ── RIGHT PANEL ── */
+    #right-panel {
+      width: 300px;
+      display: flex;
+      flex-direction: column;
+      background: #111128;
+      border-left: 1px solid #1e1e3a;
+      flex-shrink: 0;
+    }
+    #controls {
+      display: flex;
+      gap: 6px;
+      padding: 8px;
+      border-bottom: 1px solid #1e1e3a;
+      flex-wrap: wrap;
+    }
+
+    /* ── TABS ── */
+    #tabs {
+      display: flex;
+      border-bottom: 1px solid #1e1e3a;
+    }
+    .tab {
+      background: none;
+      border: none;
+      color: #888;
+      padding: 7px 14px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s;
+    }
+    .tab:hover { color: #aaaaff; }
+    .tab.active { color: #aaaaff; border-bottom: 2px solid #5555cc; }
+
+    /* ── TAB PANELS ── */
+    .tab-panel {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      scrollbar-width: thin;
+      scrollbar-color: #2a2a5a #111128;
+    }
+    .tab-panel::-webkit-scrollbar { width: 4px; }
+    .tab-panel::-webkit-scrollbar-track { background: #111128; }
+    .tab-panel::-webkit-scrollbar-thumb { background: #2a2a5a; border-radius: 4px; }
+
+    /* ── CHAT LOG ── */
+    #chat-log {
+      flex: 1;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .chat-msg {
+      padding: 7px 9px;
+      border-radius: 8px;
+      font-size: 11.5px;
+      line-height: 1.4;
+      max-width: 100%;
+    }
+    .chat-msg.user   { background: #20204a; border: 1px solid #3a3a7a; }
+    .chat-msg.agent  { background: #1a1a30; border: 1px solid #2a2a4a; }
+    .chat-msg.system { background: #181830; border: 1px solid #2a2a4a; }
+    .msg-sender { font-size: 10.5px; font-weight: bold; margin-bottom: 3px; opacity: 0.8; }
+    .msg-text { opacity: 0.9; }
+
+    /* ── TASK LIST ── */
+    #task-list {
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .task-item {
+      border-left: 3px solid #333;
+      padding: 10px;
+      margin: 2px 0;
+      background: #161628;
+      border-radius: 6px;
+      font-size: 11px;
+    }
+    .task-item.in_progress { border-left-color: #5577ff; }
+    .task-item.done { border-left-color: #44aa66; opacity: 0.7; }
+    .task-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 5px;
+      margin-bottom: 4px;
+    }
+    .task-icon { flex-shrink: 0; }
+    .task-title { font-size: 12px; font-weight: bold; flex: 1; line-height: 1.3; }
+    .task-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      margin-bottom: 4px;
+    }
+    .task-age { opacity: 0.4; }
+    .task-update { font-size: 11px; opacity: 0.7; font-style: italic; line-height: 1.3; }
+    .task-history { padding: 4px 0 0 0; display: flex; flex-direction: column; gap: 2px; }
+    .update-item { font-size: 10px; opacity: 0.6; padding: 2px 0; }
+
+    /* ── INPUT AREA ── */
+    #input-area {
+      display: flex;
+      padding: 8px;
+      gap: 6px;
+      border-top: 1px solid #1e1e3a;
+      flex-shrink: 0;
+    }
+    #chat-input {
+      flex: 1;
+      background: #1a1a30;
+      border: 1px solid #3a3a6a;
+      border-radius: 6px;
+      color: #e0e0e0;
+      padding: 7px 9px;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    #chat-input:focus { border-color: #6666cc; }
+    #chat-input::placeholder { opacity: 0.35; }
+
+    /* ── MIC BUTTON ── */
+    #mic-wrap {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+    }
+    #mic-label {
+      font-size: 11px;
+      color: rgba(170,170,255,0.7);
+      letter-spacing: 1px;
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+    }
+    #mic-wrap:hover #mic-label,
+    #mic-wrap.active #mic-label { opacity: 1; }
+    #mic-btn {
+      pointer-events: all;
+      position: relative;
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #1e1e3f, #16163a);
+      border: 1.5px solid #3a3a7a;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #mic-btn:hover {
+      border-color: #6666cc;
+      box-shadow: 0 4px 24px rgba(100,100,200,0.3), inset 0 1px 0 rgba(255,255,255,0.08);
+      transform: scale(1.05);
+    }
+    #mic-btn svg { transition: all 0.2s; }
+    #mic-btn.recording {
+      background: linear-gradient(145deg, #3a1010, #2a0a0a);
+      border-color: #cc4444;
+      box-shadow: 0 4px 24px rgba(200,60,60,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+      transform: scale(1.1);
+    }
+    #mic-btn.transcribing {
+      background: linear-gradient(145deg, #101a3a, #0a1228);
+      border-color: #4466cc;
+      box-shadow: 0 4px 24px rgba(60,100,200,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+    /* ripple rings when recording */
+    #mic-btn.recording::before,
+    #mic-btn.recording::after {
+      content: '';
+      position: absolute;
+      border-radius: 50%;
+      border: 1.5px solid rgba(204,68,68,0.5);
+      animation: micRipple 1.4s ease-out infinite;
+    }
+    #mic-btn.recording::after { animation-delay: 0.7s; }
+    @keyframes micRipple {
+      0%   { width: 54px; height: 54px; opacity: 0.8; }
+      100% { width: 90px; height: 90px; opacity: 0; }
+    }
+    /* spinner arc when transcribing */
+    #mic-btn.transcribing::before {
+      content: '';
+      position: absolute;
+      width: 62px; height: 62px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      border-top-color: #4466cc;
+      animation: micSpin 0.8s linear infinite;
+    }
+    @keyframes micSpin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ── BUTTONS ── */
+    .btn {
+      background: #20203a;
+      border: 1px solid #3a3a6a;
+      color: #e0e0e0;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      font-family: inherit;
+      transition: background 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: #2a2a5a; border-color: #5555aa; }
+    .btn.primary { background: #28286a; border-color: #6666cc; }
+    .btn.primary:hover { background: #3a3a8a; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── NOTIFICATION ── */
+    #notif {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e1e4a;
+      border: 1px solid #5555bb;
+      padding: 7px 18px;
+      border-radius: 20px;
+      font-size: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+      white-space: nowrap;
+      z-index: 10;
+    }
+    #notif.visible { opacity: 1; }
+
+    .thinking { opacity: 0.5; font-style: italic; }
+
+    /* ── FITNESS TAB ── */
+    .fitness-section { padding: 10px; border-bottom: 1px solid #1e1e3a; }
+    .fitness-section-title { font-size: 10px; opacity: 0.4; letter-spacing: 1px; margin-bottom: 8px; }
+    .fitness-today-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .fitness-square {
+      width: 28px; height: 28px; border-radius: 5px;
+      background: #1e1e3a; border: 1px solid #333;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; transition: background 0.3s;
+    }
+    .fitness-square.weights { background: #6b1a1a; border-color: #cc3333; }
+    .fitness-square.running { background: #1a2e6b; border-color: #3366cc; }
+    .fitness-square.both    { background: #3a1a6b; border-color: #8844cc; }
+    .fitness-square.ate-well-ring { box-shadow: 0 0 0 2px #ccaa00; }
+    .macro-bar-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; font-size: 11px; }
+    .macro-label { width: 52px; opacity: 0.6; }
+    .macro-track { flex: 1; height: 5px; background: #1e1e3a; border-radius: 3px; overflow: hidden; }
+    .macro-fill  { height: 100%; border-radius: 3px; transition: width 0.4s; }
+    .macro-val   { width: 38px; text-align: right; opacity: 0.8; font-size: 10px; }
+    .week-grid { display: flex; gap: 4px; flex-wrap: wrap; }
+    .week-cell {
+      width: 30px; height: 30px; border-radius: 4px;
+      background: #1e1e3a; border: 1px solid #2a2a4a;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; font-size: 8px; opacity: 0.7;
+      cursor: default;
+    }
+    .week-cell.weights { background: #6b1a1a; border-color: #cc3333; opacity: 1; }
+    .week-cell.running { background: #1a2e6b; border-color: #3366cc; opacity: 1; }
+    .week-cell.both    { background: #3a1a6b; border-color: #8844cc; opacity: 1; }
+    .week-cell .wc-dot { font-size: 10px; }
+    .week-cell .wc-day { font-size: 8px; opacity: 0.6; margin-top: 1px; }
+    .week-cell.ate-well { box-shadow: 0 0 0 2px #ccaa00; }
+    .quick-btns { display: flex; gap: 5px; flex-wrap: wrap; }
+    .fitness-btn { font-size: 11px; padding: 5px 8px; flex: 1; min-width: 70px; }
+    .max-online  { width: 8px; height: 8px; border-radius: 50%; background: #00e888; display: inline-block; margin-right: 4px; }
+    .max-offline { background: #ff4444; }
+    #fitness-input-row { display: flex; gap: 6px; padding: 8px; border-top: 1px solid #1e1e3a; flex-shrink: 0; }
+    #fitness-input {
+      flex: 1; background: #1a1a30; border: 1px solid #3a3a6a; border-radius: 6px;
+      color: #e0e0e0; padding: 7px 9px; font-size: 12px; font-family: inherit; outline: none;
+    }
+    #fitness-input:focus { border-color: #FF6B35; }
+    .notes-preview { font-size: 10px; opacity: 0.5; font-style: italic; padding: 0 10px 6px; line-height: 1.3; }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <div id="title">AGENT HQ</div>
+  <div id="agent-badges"></div>
+  <div id="event-badge"></div>
+</div>
+
+<div id="main">
+  <div id="canvas-wrap">
+    <canvas id="c"></canvas>
+    <div id="notif"></div>
+  </div>
+
+  <div id="right-panel">
+    <div id="controls">
+      <button class="btn primary" id="btn-standup" onclick="doStandup()">📋 Standup</button>
+      <button class="btn" id="btn-break" onclick="doBreak()">☕ Break</button>
+      <button class="btn" id="btn-focus" onclick="doFocus()">🎯 Focus</button>
+    </div>
+    <div id="tabs">
+      <button class="tab active" onclick="switchTab('chat')" id="tab-btn-chat">💬 Chat</button>
+      <button class="tab" onclick="switchTab('tasks')" id="tab-btn-tasks">📋 Tasks <span id="task-count"></span></button>
+      <button class="tab" onclick="switchTab('fitness')" id="tab-btn-fitness">💪 Fitness</button>
+    </div>
+    <div id="panel-chat" class="tab-panel">
+      <div id="chat-log"></div>
+    </div>
+    <div id="panel-tasks" class="tab-panel" style="display:none">
+      <div id="task-list"><div style="padding:16px;opacity:0.4;font-size:12px">No tasks yet. Type a task in the input below (e.g. "research Claude Code hooks") and it will be auto-assigned.</div></div>
+    </div>
+    <div id="panel-fitness" class="tab-panel" style="display:none;flex-direction:column">
+      <!-- Today -->
+      <div class="fitness-section">
+        <div class="fitness-section-title">TODAY <span id="fitness-date"></span></div>
+        <div class="fitness-today-row">
+          <div class="fitness-square" id="fsq-main" title="Activity"></div>
+          <div style="flex:1">
+            <div style="font-size:11px;opacity:0.5" id="fitness-status-text">Loading...</div>
+            <div style="font-size:10px;opacity:0.35" id="fitness-notes-preview"></div>
+          </div>
+          <button class="btn" style="font-size:10px;padding:3px 7px" onclick="refreshFitnessPanel()">↻</button>
+        </div>
+        <div id="macro-bars"></div>
+      </div>
+      <!-- Week -->
+      <div class="fitness-section">
+        <div class="fitness-section-title">THIS WEEK</div>
+        <div class="week-grid" id="week-grid"></div>
+      </div>
+      <!-- Quick log -->
+      <div class="fitness-section">
+        <div class="fitness-section-title">QUICK LOG</div>
+        <div class="quick-btns">
+          <button class="btn fitness-btn" onclick="quickLog('weights')">🏋️ Weights</button>
+          <button class="btn fitness-btn" onclick="quickLog('running')">🏃 Run</button>
+          <button class="btn fitness-btn" onclick="quickLog('ateWell')">🥗 Ate Well</button>
+          <button class="btn fitness-btn" onclick="quickLog('show')">📊 Grid</button>
+        </div>
+      </div>
+      <!-- Max status -->
+      <div class="fitness-section" style="display:flex;align-items:center;gap:6px;font-size:11px">
+        <span class="max-online" id="max-status-dot"></span>
+        <span id="max-status-text" style="opacity:0.6">Max checking in...</span>
+      </div>
+      <!-- Input -->
+      <div id="fitness-input-row" style="margin-top:auto">
+        <input type="text" id="fitness-input"
+          placeholder='Tell Max: "ran 3 miles" or "had chicken and rice"...'
+          onkeydown="if(event.key==='Enter')sendFitnessMsg()" />
+        <button class="btn primary" onclick="sendFitnessMsg()">→</button>
+      </div>
+    </div>
+    <div id="input-area">
+      <input type="text" id="chat-input"
+        placeholder="Message team, @Name task, or /standup..."
+        onkeydown="if(event.key==='Enter')sendMsg()" />
+      <button class="btn primary" onclick="sendMsg()">→</button>
+    </div>
+
+    <!-- Floating mic button -->
+    <div id="mic-wrap">
+      <span id="mic-label">HOLD TO SPEAK</span>
+      <button id="mic-btn"
+        onmousedown="startVoice(event)" onmouseup="stopVoice()" onmouseleave="stopVoice()"
+        ontouchstart="startVoice(event)" ontouchend="stopVoice()">
+        <!-- mic icon (idle / recording) -->
+        <svg id="mic-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8888cc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2" width="6" height="11" rx="3"/>
+          <path d="M5 10a7 7 0 0 0 14 0"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+          <line x1="9" y1="21" x2="15" y2="21"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════════════════
+
+const TW = 64, TH = 32;   // tile width / height
+const GW = 22, GH = 15;   // grid dimensions
+const AGENT_SPEED = 2.0;   // tiles per second
+
+const AGENT_DEFS = [
+  { id:'alex',   name:'Alex',   role:'Engineer',  hue:'#4A90E2', dark:'#1e4a8a', personality:'Methodical and detail-oriented. Loves clean code and documentation.' },
+  { id:'sam',    name:'Sam',    role:'Designer',  hue:'#E2784A', dark:'#8a3a1e', personality:'Creative and user-focused. Always thinking about aesthetics and UX.' },
+  { id:'jordan', name:'Jordan', role:'PM',        hue:'#4AE280', dark:'#1e8a48', personality:'Organized and communicative. Keeps the team aligned on goals.' },
+  { id:'casey',  name:'Casey',  role:'DevOps',    hue:'#E24A90', dark:'#8a1e50', personality:'Pragmatic and reliability-focused. Automates everything possible.' },
+  { id:'riley',  name:'Riley',  role:'QA',        hue:'#9B4AE2', dark:'#521e8a', personality:'Thorough and skeptical. Finds edge cases nobody else thinks of.' },
+  { id:'max',    name:'Max',    role:'Fitness Coach', hue:'#FF6B35', dark:'#8a2500', personality:'Energetic and motivating. Obsessed with gains, PRs, and clean eating. Uses fitness emojis naturally.' },
+];
+
+const LOCS = {
+  meeting:     { x:3.5, y:3.5, label:'Meeting Room' },
+  coffee:      { x:18,  y:2,   label:'Break Room'   },
+  lounge:      { x:17,  y:11,  label:'Lounge'       },
+  whiteboard:  { x:13,  y:6,   label:'Whiteboard'   },
+  desk_alex:   { x:6,   y:5,   label:"Alex's Desk"  },
+  desk_sam:    { x:9,   y:5,   label:"Sam's Desk"   },
+  desk_jordan: { x:12,  y:5,   label:"Jordan's Desk"},
+  desk_casey:  { x:6,   y:9,   label:"Casey's Desk" },
+  desk_riley:  { x:9,   y:9,   label:"Riley's Desk" },
+  desk_max:    { x:18,  y:4,   label:"Max's Station" },
+  gym:         { x:17,  y:4,   label:'Gym'           },
+};
+
+// Furniture: [type, x, y]
+const FURN = [
+  // Meeting room
+  ['round_table', 3, 3],
+  ['chair', 2, 2], ['chair', 4, 2], ['chair', 2, 4], ['chair', 4, 4], ['chair', 3, 2],
+
+  // Desks row 1
+  ['desk', 6, 4],  ['monitor', 6, 4],
+  ['desk', 9, 4],  ['monitor', 9, 4],
+  ['desk', 12, 4], ['monitor', 12, 4],
+
+  // Desks row 2
+  ['desk', 6, 8],  ['monitor', 6, 8],
+  ['desk', 9, 8],  ['monitor', 9, 8],
+
+  // Whiteboard
+  ['whiteboard', 14, 5],
+
+  // Break room
+  ['counter', 18, 2], ['coffee_machine', 19, 2],
+
+  // Lounge
+  ['couch', 15, 10], ['couch', 17, 10], ['small_table', 16, 11],
+
+  // Server room
+  ['server', 1, 7], ['server', 1, 8], ['server', 1, 9],
+
+  // Partitions
+  ['partition', 5, 1], ['partition', 5, 2], ['partition', 5, 3],
+  ['partition', 14, 1], ['partition', 14, 2],
+
+  // Gym area (top-right corner)
+  ['gym_mat', 15, 4], ['gym_mat', 16, 4],
+  ['treadmill', 17, 3],
+  ['weight_rack', 18, 3],
+  ['partition', 14, 3], ['partition', 14, 4],
+];
+
+// ═══════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════
+
+let agents = [];
+let bubbles = [];
+let tasks = [];
+let simRunning = false;
+let standupBusy = false;
+let eventBusy = false;
+let lastT = 0;
+
+// ═══════════════════════════════════════════════════════════
+//  CANVAS SETUP
+// ═══════════════════════════════════════════════════════════
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+const OFFSET_X = (GH * TW / 2);
+const OFFSET_Y = 60;
+canvas.width  = (GW + GH) * TW / 2;
+canvas.height = (GW + GH) * TH / 2 + OFFSET_Y + 80;
+
+// ═══════════════════════════════════════════════════════════
+//  ISO MATH
+// ═══════════════════════════════════════════════════════════
+
+function iso(x, y) {
+  return {
+    sx: (x - y) * (TW / 2) + canvas.width / 2,
+    sy: (x + y) * (TH / 2) + OFFSET_Y,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DRAW HELPERS
+// ═══════════════════════════════════════════════════════════
+
+function rrect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+function isoTile(x, y, fill, stroke = null, sw = 0.5) {
+  const { sx, sy } = iso(x, y);
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(sx + TW/2, sy + TH/2);
+  ctx.lineTo(sx, sy + TH);
+  ctx.lineTo(sx - TW/2, sy + TH/2);
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  if (stroke) {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = sw;
+    ctx.stroke();
+  }
+}
+
+function isoBox(x, y, fillTop, fillLeft, fillRight, h, sw = 0.5) {
+  const { sx, sy } = iso(x, y);
+  isoTile(x, y, fillTop, null);
+  // left face
+  ctx.beginPath();
+  ctx.moveTo(sx - TW/2, sy + TH/2);
+  ctx.lineTo(sx, sy + TH);
+  ctx.lineTo(sx, sy + TH + h);
+  ctx.lineTo(sx - TW/2, sy + TH/2 + h);
+  ctx.closePath();
+  ctx.fillStyle = fillLeft;
+  ctx.fill();
+  ctx.strokeStyle = '#0008'; ctx.lineWidth = sw; ctx.stroke();
+  // right face
+  ctx.beginPath();
+  ctx.moveTo(sx, sy + TH);
+  ctx.lineTo(sx + TW/2, sy + TH/2);
+  ctx.lineTo(sx + TW/2, sy + TH/2 + h);
+  ctx.lineTo(sx, sy + TH + h);
+  ctx.closePath();
+  ctx.fillStyle = fillRight;
+  ctx.fill();
+  ctx.strokeStyle = '#0008'; ctx.lineWidth = sw; ctx.stroke();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FURNITURE DRAWING
+// ═══════════════════════════════════════════════════════════
+
+function drawDesk(x, y) {
+  const { sx, sy } = iso(x, y);
+  const s = 0.85, h = 18;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - h);
+  ctx.lineTo(sx + (TW/2)*s, sy + (TH/2)*s - h);
+  ctx.lineTo(sx, sy + TH*s - h);
+  ctx.lineTo(sx - (TW/2)*s, sy + (TH/2)*s - h);
+  ctx.closePath();
+  ctx.fillStyle = '#7B5B2A'; ctx.fill();
+  ctx.strokeStyle = '#5a4010'; ctx.lineWidth = 0.8; ctx.stroke();
+  // left face
+  ctx.beginPath();
+  ctx.moveTo(sx - (TW/2)*s, sy + (TH/2)*s - h);
+  ctx.lineTo(sx, sy + TH*s - h);
+  ctx.lineTo(sx, sy + TH*s);
+  ctx.lineTo(sx - (TW/2)*s, sy + (TH/2)*s);
+  ctx.closePath();
+  ctx.fillStyle = '#5a4010'; ctx.fill(); ctx.stroke();
+  // right face
+  ctx.beginPath();
+  ctx.moveTo(sx, sy + TH*s - h);
+  ctx.lineTo(sx + (TW/2)*s, sy + (TH/2)*s - h);
+  ctx.lineTo(sx + (TW/2)*s, sy + (TH/2)*s);
+  ctx.lineTo(sx, sy + TH*s);
+  ctx.closePath();
+  ctx.fillStyle = '#4a3008'; ctx.fill(); ctx.stroke();
+}
+
+function drawMonitor(x, y) {
+  const { sx, sy } = iso(x, y);
+  const dh = 18;
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(sx - 10, sy - dh - 22, 20, 15);
+  ctx.fillStyle = '#1e6baf';
+  ctx.fillRect(sx - 9, sy - dh - 21, 18, 13);
+  ctx.fillStyle = 'rgba(30,107,175,0.25)';
+  ctx.fillRect(sx - 11, sy - dh - 23, 22, 17);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(sx - 2, sy - dh - 7, 4, 7);
+}
+
+function drawChair(x, y) {
+  const { sx, sy } = iso(x, y);
+  ctx.fillStyle = '#2a3860';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + TH * 0.35, 9, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#1a2845'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = '#1a2845';
+  ctx.fillRect(sx - 2.5, sy + TH * 0.35 - 9, 2, 9);
+}
+
+function drawRoundTable(x, y) {
+  const { sx, sy } = iso(x, y);
+  ctx.fillStyle = '#4a2a08';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + TH * 0.55 + 5, 26, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#8B5E2A';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + TH * 0.55, 26, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#5a3a10'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = '#7a5020';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + TH * 0.55, 16, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawCouch(x, y) {
+  const { sx, sy } = iso(x, y);
+  ctx.fillStyle = '#2a4a90';
+  ctx.fillRect(sx - 23, sy + 4, 46, 14);
+  ctx.fillStyle = '#3a5aaa';
+  ctx.fillRect(sx - 23, sy + 14, 46, 11);
+  ctx.fillStyle = '#4a6ac0';
+  ctx.fillRect(sx - 21, sy + 14, 19, 11);
+  ctx.fillRect(sx + 2,  sy + 14, 19, 11);
+  ctx.fillStyle = '#22408a';
+  ctx.fillRect(sx - 25, sy + 4, 4, 22);
+  ctx.fillRect(sx + 21, sy + 4, 4, 22);
+}
+
+function drawSmallTable(x, y) {
+  const { sx, sy } = iso(x, y);
+  ctx.fillStyle = '#5a3812'; ctx.beginPath();
+  ctx.ellipse(sx, sy + TH * 0.55, 14, 8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#7a5024'; ctx.beginPath();
+  ctx.ellipse(sx, sy + TH * 0.55 - 4, 14, 8, 0, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawCoffeeMachine(x, y) {
+  const { sx, sy } = iso(x, y);
+  ctx.fillStyle = '#181818';
+  ctx.fillRect(sx - 11, sy - 28, 22, 28);
+  ctx.fillStyle = '#cc5520';
+  ctx.fillRect(sx - 9, sy - 26, 18, 16);
+  ctx.fillStyle = '#0a0a0a';
+  ctx.beginPath();
+  ctx.arc(sx, sy - 14, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#222';
+  ctx.fillRect(sx - 5, sy - 4, 10, 4);
+}
+
+function drawCounter(x, y) {
+  isoBox(x, y, '#d5cfc0', '#5a4520', '#4a3510', 22);
+}
+
+function drawServer(x, y) {
+  const { sx, sy } = iso(x, y);
+  ctx.fillStyle = '#141e14';
+  ctx.fillRect(sx - 14, sy - 30, 28, 30);
+  for (let i = 0; i < 3; i++) {
+    ctx.fillStyle = '#1e2e1e';
+    ctx.fillRect(sx - 12, sy - 27 + i * 9, 24, 7);
+    ctx.fillStyle = '#00e844';
+    ctx.beginPath();
+    ctx.arc(sx + 8, sy - 23 + i * 9, 2, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+function drawWhiteboard(x, y) {
+  const { sx, sy } = iso(x, y);
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(sx - 20, sy - 42, 40, 32);
+  ctx.fillStyle = '#f0efff';
+  ctx.fillRect(sx - 18, sy - 40, 36, 28);
+  ctx.strokeStyle = '#8888cc'; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(sx - 14, sy - 32); ctx.lineTo(sx - 2,  sy - 32);
+  ctx.moveTo(sx - 14, sy - 26); ctx.lineTo(sx + 6,  sy - 26);
+  ctx.moveTo(sx - 14, sy - 20); ctx.lineTo(sx + 2,  sy - 20);
+  ctx.stroke();
+}
+
+function drawPartition(x, y) {
+  isoBox(x, y, '#9aabb5', '#7a8fa0', '#6a7f90', 30, 0.3);
+}
+
+function drawGymMat(x, y) {
+  const { sx, sy } = iso(x, y);
+  // Green exercise mat
+  ctx.fillStyle = '#1a4a1a';
+  ctx.beginPath();
+  ctx.moveTo(sx, sy + 4);
+  ctx.lineTo(sx + TW/2 - 2, sy + TH/2 + 4);
+  ctx.lineTo(sx, sy + TH - 2);
+  ctx.lineTo(sx - TW/2 + 2, sy + TH/2 + 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#2a6a2a'; ctx.lineWidth = 0.8; ctx.stroke();
+  // Lines on mat
+  ctx.strokeStyle = '#1e561e'; ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(sx - TW/4, sy + TH/2 + 2); ctx.lineTo(sx + TW/4, sy + TH/2 + 2);
+  ctx.stroke();
+}
+
+function drawTreadmill(x, y) {
+  const { sx, sy } = iso(x, y);
+  // Base
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(sx - 16, sy - 5, 32, 18);
+  // Belt
+  ctx.fillStyle = '#333';
+  ctx.fillRect(sx - 13, sy - 3, 26, 12);
+  // Console
+  ctx.fillStyle = '#222';
+  ctx.fillRect(sx - 8, sy - 28, 16, 20);
+  ctx.fillStyle = '#FF6B35';
+  ctx.fillRect(sx - 6, sy - 26, 12, 8);
+  // Handle bars
+  ctx.strokeStyle = '#444'; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(sx - 12, sy - 10); ctx.lineTo(sx - 8, sy - 26);
+  ctx.moveTo(sx + 12, sy - 10); ctx.lineTo(sx + 8, sy - 26);
+  ctx.stroke();
+}
+
+function drawWeightRack(x, y) {
+  const { sx, sy } = iso(x, y);
+  // Rack frame
+  ctx.fillStyle = '#333';
+  ctx.fillRect(sx - 15, sy - 35, 30, 35);
+  // Bar
+  ctx.fillStyle = '#888';
+  ctx.fillRect(sx - 18, sy - 30, 36, 5);
+  // Plates
+  const plateColors = ['#cc3333','#3366cc','#ccaa00'];
+  [-14, -8, 8, 14].forEach((ox, i) => {
+    ctx.fillStyle = plateColors[i % 3];
+    ctx.fillRect(sx + ox - 3, sy - 34, 6, 16);
+  });
+  // Dumbbells on shelf
+  ctx.fillStyle = '#555';
+  ctx.fillRect(sx - 12, sy - 10, 8, 5);
+  ctx.fillRect(sx + 4,  sy - 10, 8, 5);
+}
+
+function drawWallTile(x, y) {
+  isoBox(x, y, '#9faaba', '#7a8599', '#6a7589', 45, 0.4);
+}
+
+function drawFloorTile(x, y) {
+  let color = '#f0ead8';
+  if (x <= 5 && y <= 6) color = '#ece8f4';
+  else if (x >= 14 && y <= 7) color = '#eeeae0';
+  else if (x >= 14 && y >= 8) color = '#e8f0ec';
+  else if (x <= 4) color = '#e0e8e4';
+  isoTile(x, y, color, '#d8d2c0', 0.4);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  AGENT CLASS
+// ═══════════════════════════════════════════════════════════
+
+class Agent {
+  constructor(def) {
+    Object.assign(this, def);
+    this.x = LOCS[`desk_${def.id}`].x + (Math.random()-0.5)*0.4;
+    this.y = LOCS[`desk_${def.id}`].y + (Math.random()-0.5)*0.4;
+    this.tx = this.x; this.ty = this.y;
+    this.targetLocKey = `desk_${def.id}`;
+    this.status = 'working';
+    this.task = 'Getting settled';
+    this.memory = [];
+    this.thinkTimer = Math.random() * 8000;  // stagger initial thinks
+    this.taskWorkTimer = 0;
+    this.nextTaskWorkIn = Infinity; // set when task assigned
+    this.activeTaskId = null;
+    this.isBusy = false;
+    this.walkFrame = 0;
+    this.walkClock = 0;
+    this.bob = 0;
+    this.bobDir = 1;
+    const hairColors = ['#1a1000','#8B4513','#111','#3a2a00','#501a00'];
+    this.hairColor = hairColors[AGENT_DEFS.findIndex(d => d.id === def.id)] || '#111';
+  }
+
+  goTo(key) {
+    const loc = LOCS[key];
+    if (!loc) return;
+    this.tx = loc.x + (Math.random()-0.5)*0.6;
+    this.ty = loc.y + (Math.random()-0.5)*0.6;
+    this.targetLocKey = key;
+    this.status = 'moving';
+    this.task = `Going to ${loc.label}`;
+  }
+
+  atTarget() {
+    return Math.hypot(this.x - this.tx, this.y - this.ty) < 0.4;
+  }
+
+  update(dt) {
+    const dx = this.tx - this.x, dy = this.ty - this.y;
+    const d = Math.sqrt(dx*dx + dy*dy);
+    if (d > 0.05) {
+      const move = AGENT_SPEED * (dt / 1000);
+      this.x += (dx/d) * Math.min(move, d);
+      this.y += (dy/d) * Math.min(move, d);
+      this.walkClock += dt;
+      if (this.walkClock > 130) { this.walkFrame = (this.walkFrame+1)%4; this.walkClock=0; }
+    } else {
+      if (this.status === 'moving') {
+        this.status = this.activeTaskId ? 'working' : 'idle';
+        this.task = LOCS[this.targetLocKey]?.label || this.task;
+      }
+      this.bob += 0.04 * this.bobDir;
+      if (Math.abs(this.bob) > 1.0) this.bobDir *= -1;
+    }
+    if (!this.isBusy) {
+      this.thinkTimer += dt;
+      if (this.activeTaskId) this.taskWorkTimer += dt;
+    }
+  }
+
+  remember(evt) {
+    this.memory.push(`[${new Date().toLocaleTimeString()}] ${evt}`);
+    if (this.memory.length > 12) this.memory.shift();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DRAW AGENT
+// ═══════════════════════════════════════════════════════════
+
+function drawAgent(agent) {
+  const { sx, sy } = iso(agent.x, agent.y);
+  const moving = Math.hypot(agent.tx - agent.x, agent.ty - agent.y) > 0.08;
+  const wb = moving ? Math.sin(agent.walkFrame * Math.PI / 2) * 3 : agent.bob;
+  const by = sy - wb;
+
+  // shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + TH * 0.25, 9, 4.5, 0, 0, Math.PI * 2); ctx.fill();
+
+  // body
+  ctx.fillStyle = agent.dark;
+  ctx.fillRect(sx - 7, by - 22, 14, 17);
+  ctx.fillStyle = agent.hue;
+  ctx.fillRect(sx - 5.5, by - 20, 11, 11);
+
+  // legs
+  if (moving) {
+    const ls = Math.sin(agent.walkFrame * Math.PI / 2) * 4;
+    ctx.fillStyle = '#18243c';
+    ctx.fillRect(sx - 6, by - 5, 5, 10 + ls);
+    ctx.fillRect(sx + 1, by - 5, 5, 10 - ls);
+  } else {
+    ctx.fillStyle = '#18243c';
+    ctx.fillRect(sx - 6, by - 5, 5, 10);
+    ctx.fillRect(sx + 1, by - 5, 5, 10);
+  }
+
+  // head
+  ctx.fillStyle = '#f5c499';
+  ctx.beginPath();
+  ctx.arc(sx, by - 27, 8.5, 0, Math.PI * 2); ctx.fill();
+
+  // hair
+  ctx.fillStyle = agent.hairColor;
+  ctx.beginPath();
+  ctx.arc(sx, by - 28, 8.5, Math.PI, 0); ctx.fill();
+
+  // eyes
+  ctx.fillStyle = '#222';
+  ctx.beginPath();
+  ctx.arc(sx - 3, by - 28, 1.5, 0, Math.PI * 2);
+  ctx.arc(sx + 3, by - 28, 1.5, 0, Math.PI * 2); ctx.fill();
+
+  // name tag
+  ctx.font = 'bold 10px Courier New';
+  const tw = ctx.measureText(agent.name).width;
+  const tagX = sx - tw / 2 - 5, tagY = by - 48;
+  rrect(tagX, tagY - 1, tw + 10, 14, 4);
+  ctx.fillStyle = 'rgba(10,10,30,0.75)'; ctx.fill();
+  ctx.strokeStyle = agent.hue; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = agent.hue;
+  ctx.textAlign = 'center'; ctx.fillText(agent.name, sx, tagY + 10);
+
+  const dotColors = {
+    working:'#00e888', moving:'#ffaa22', idle:'#88aaff',
+    in_meeting:'#ff88ff', talking:'#ffff55'
+  };
+  ctx.fillStyle = dotColors[agent.status] || '#888';
+  ctx.beginPath();
+  ctx.arc(tagX + tw + 12, tagY + 6, 3.5, 0, Math.PI * 2); ctx.fill();
+
+  // Thinking spinner: 3 orbiting dots above name tag when busy
+  if (agent.isBusy) {
+    const t = Date.now() / 380;
+    for (let i = 0; i < 3; i++) {
+      const phase = t + (i * Math.PI * 2 / 3);
+      ctx.globalAlpha = 0.45 + 0.55 * ((Math.sin(phase) + 1) / 2);
+      ctx.fillStyle = agent.hue;
+      ctx.beginPath();
+      ctx.arc(sx - 8 + i * 8, tagY - 10, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawBubble(agent, text) {
+  const { sx, sy } = iso(agent.x, agent.y);
+  const bY = sy - agent.bob - 75;
+
+  ctx.font = '11px Courier New';
+
+  const words = text.split(' ');
+  const lines = []; let cur = '';
+  for (const w of words) {
+    if ((cur + w).length > 27) { if (cur) lines.push(cur.trim()); cur = w + ' '; }
+    else cur += w + ' ';
+  }
+  if (cur.trim()) lines.push(cur.trim());
+
+  const lh = 14, px = 9, py = 6;
+  const mw = Math.max(...lines.map(l => ctx.measureText(l).width)) + px * 2;
+  const mh = lines.length * lh + py * 2;
+  const bx = sx - mw / 2;
+  const bTop = bY - mh;
+
+  rrect(bx, bTop, mw, mh, 7);
+  ctx.fillStyle = 'rgba(238,238,255,0.97)'; ctx.fill();
+  ctx.strokeStyle = agent.hue; ctx.lineWidth = 1.8; ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(sx - 5, bTop + mh);
+  ctx.lineTo(sx + 5, bTop + mh);
+  ctx.lineTo(sx, bTop + mh + 9);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(238,238,255,0.97)'; ctx.fill();
+  ctx.strokeStyle = agent.hue; ctx.lineWidth = 1.2; ctx.stroke();
+
+  ctx.fillStyle = '#111';
+  ctx.textAlign = 'center';
+  lines.forEach((l, i) => ctx.fillText(l, sx, bTop + py + (i + 1) * lh - 2));
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════════════════
+
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height * 0.5);
+  grad.addColorStop(0, '#0a0a25');
+  grad.addColorStop(1, '#0d0d1c');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const furnMap = {};
+  for (const f of FURN) {
+    const k = `${f[1]},${f[2]}`;
+    if (!furnMap[k]) furnMap[k] = [];
+    furnMap[k].push(f[0]);
+  }
+
+  // Render in isometric order (back-to-front)
+  for (let sum = 0; sum <= (GW-1)+(GH-1); sum++) {
+    for (let x = 0; x <= sum; x++) {
+      const y = sum - x;
+      if (x < 0 || x >= GW || y < 0 || y >= GH) continue;
+
+      const isWall = x === 0 || x === GW-1 || y === 0 || y === GH-1;
+      if (isWall) { drawWallTile(x, y); continue; }
+      drawFloorTile(x, y);
+
+      const types = furnMap[`${x},${y}`] || [];
+      for (const t of types) {
+        if (t === 'desk')           drawDesk(x, y);
+        if (t === 'monitor')        drawMonitor(x, y);
+        if (t === 'chair')          drawChair(x, y);
+        if (t === 'round_table')    drawRoundTable(x, y);
+        if (t === 'couch')          drawCouch(x, y);
+        if (t === 'small_table')    drawSmallTable(x, y);
+        if (t === 'coffee_machine') drawCoffeeMachine(x, y);
+        if (t === 'counter')        drawCounter(x, y);
+        if (t === 'server')         drawServer(x, y);
+        if (t === 'whiteboard')     drawWhiteboard(x, y);
+        if (t === 'partition')      drawPartition(x, y);
+        if (t === 'gym_mat')        drawGymMat(x, y);
+        if (t === 'treadmill')      drawTreadmill(x, y);
+        if (t === 'weight_rack')    drawWeightRack(x, y);
+      }
+    }
+  }
+
+  // Draw agents sorted by depth
+  const sorted = [...agents].sort((a, b) => (a.x + a.y) - (b.x + b.y));
+  for (const ag of sorted) drawAgent(ag);
+
+  // Draw speech bubbles
+  const now = Date.now();
+  bubbles = bubbles.filter(b => b.expiry > now);
+  for (const b of bubbles) {
+    const ag = agents.find(a => a.id === b.agentId);
+    if (ag) drawBubble(ag, b.text);
+  }
+
+  // Room labels
+  ctx.font = '10px Courier New';
+  ctx.fillStyle = 'rgba(180,180,255,0.3)';
+  ctx.textAlign = 'center';
+  [
+    { x:3,  y:1,  t:'MEETING ROOM' },
+    { x:17, y:2,  t:'BREAK ROOM'   },
+    { x:17, y:10, t:'LOUNGE'       },
+    { x:9,  y:2,  t:'WORK AREA'    },
+    { x:1,  y:8,  t:'SERVERS'      },
+  ].forEach(l => {
+    const { sx, sy } = iso(l.x, l.y);
+    ctx.fillText(l.t, sx, sy - 5);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CLAUDE API (via backend)
+// ═══════════════════════════════════════════════════════════
+
+async function claude(system, user, maxTokens = 200) {
+  const r = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ system, user, maxTokens }),
+  });
+  const data = await r.json();
+  if (!r.ok || data.error) throw new Error(data.error || `HTTP ${r.status}`);
+  return data.text;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TASK SYSTEM
+// ═══════════════════════════════════════════════════════════
+
+function pickBestAgent(desc) {
+  const d = desc.toLowerCase();
+  if (/design|ui|ux|visual|layout|figma|color|style/.test(d))         return agents.find(a => a.role==='Designer');
+  if (/test|qa|bug|quality|coverage|regression/.test(d))               return agents.find(a => a.role==='QA');
+  if (/deploy|ci|cd|infra|server|docker|aws|monitor|pipeline/.test(d)) return agents.find(a => a.role==='DevOps');
+  if (/plan|roadmap|sprint|priorit|stakeholder|deadline|scope/.test(d)) return agents.find(a => a.role==='PM');
+  return agents.find(a => a.role==='Engineer');
+}
+
+async function createTask(description, explicitAgentId = null) {
+  const assignee = explicitAgentId
+    ? agents.find(a => a.id === explicitAgentId)
+    : pickBestAgent(description);
+  if (!assignee) return;
+
+  let title = description.length > 45 ? description.slice(0, 42) + '...' : description;
+  try {
+    const raw = await claude(
+      'Extract a short task title (max 40 chars). Return ONLY the title text, no quotes, no JSON.',
+      description, 60
+    );
+    if (raw.trim().length < 50) title = raw.trim();
+  } catch {}
+
+  const task = {
+    id: 'task_' + Date.now(),
+    title,
+    description,
+    assigneeId: assignee.id,
+    status: 'in_progress',
+    updates: [],
+    createdAt: Date.now(),
+  };
+  tasks.push(task);
+  assignee.activeTaskId = task.id;
+  // First update fires in 8-12 seconds; threshold is fixed (not per-frame random)
+  assignee.taskWorkTimer = 0;
+  assignee.nextTaskWorkIn = 8000 + Math.random() * 4000;
+
+  // Move to desk first (let goTo own the status so walk animation plays)
+  const deskKey = `desk_${assignee.id}`;
+  if (LOCS[deskKey]) {
+    assignee.goTo(deskKey);   // sets status='moving', tx/ty = desk pos
+  }
+  assignee.task = `Working: ${title.slice(0,30)}`;
+
+  // Acknowledge (async — fires while agent walks)
+  try {
+    const sys = `You are ${assignee.name}, ${assignee.role} at AgentCo. You just got assigned: "${title}". Acknowledge in 1 casual sentence, max 75 chars. Sound like yourself: ${assignee.personality}`;
+    const ack = (await claude(sys, 'Acknowledge:', 90)).trim().replace(/^"|"$/g, '');
+    addBubble(assignee.id, ack, 7000);
+  } catch (e) {
+    sysMsg(`⚠️ ${assignee.name} ack failed: ${e.message}`);
+    addBubble(assignee.id, `On it — working on "${title.slice(0,25)}..."`, 5000);
+  }
+  assignee.remember(`Assigned task: ${title}`);
+
+  updateTaskPanel();
+  sysMsg(`📋 Task → ${assignee.name}: "${title}"`);
+  return task;
+}
+
+async function doTaskWork(agent, task) {
+  if (agent.isBusy || task.status !== 'in_progress') return;
+  agent.isBusy = true;
+
+  const updateNum = task.updates.length + 1;
+  const isLast = updateNum >= 4;
+
+  const sys = `You are ${agent.name}, ${agent.role} at AgentCo. Personality: ${agent.personality}
+You are autonomously working on: "${task.description}"
+Generate update #${updateNum} of ~4. Be specific and realistic for your role.
+Previous updates: ${task.updates.length ? task.updates.join(' | ') : 'none yet'}
+${isLast ? 'This is your FINAL update — wrap up and announce completion!' : 'Show meaningful progress.'}
+Max 100 chars. Plain text only.`;
+
+  try {
+    const update = (await claude(sys, 'Your work update:', 120)).trim().replace(/^"|"$/g,'');
+    task.updates.push(update);
+    if (isLast || /done|complet|finish|wrap|ship/i.test(update)) {
+      task.status = 'done';
+      agent.activeTaskId = null;
+      agent.status = 'idle';
+      agent.task = 'Task complete';
+      addBubble(agent.id, update, 8000);
+      sysMsg(`✅ ${agent.name} completed: "${task.title}"`);
+    } else {
+      addBubble(agent.id, update, 7000);
+    }
+    updateTaskPanel();
+  } catch (e) {
+    sysMsg(`⚠️ ${agent.name} task error: ${e.message}`);
+  }
+
+  agent.isBusy = false;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  AUTONOMOUS AGENT THINK
+// ═══════════════════════════════════════════════════════════
+
+async function agentThink(agent) {
+  if (agent.isBusy) return;
+  agent.isBusy = true;
+
+  const nearby = agents
+    .filter(a => a.id !== agent.id && Math.hypot(a.x-agent.x, a.y-agent.y) < 5)
+    .map(a => a.name).join(', ') || 'nobody nearby';
+  const locKeys = Object.keys(LOCS).join('|');
+
+  const sys = `You are ${agent.name}, ${agent.role} at AgentCo startup. Personality: ${agent.personality}
+Respond ONLY with valid JSON (no other text):
+{"action":"move"|"say"|"work","location":"${locKeys}","message":"max 70 chars","task":"what you are doing"}
+- move: go somewhere (give location)
+- say: say something to nearby colleagues (give message)
+- work: stay at desk and work (give task description)
+Nearby: ${nearby}. Current location: ${LOCS[agent.targetLocKey]?.label}. Status: ${agent.status}.
+Recent memory: ${agent.memory.slice(-3).join(' | ') || 'nothing'}.`;
+
+  try {
+    const raw = await claude(sys, 'Decide your next action. JSON only:', 120);
+    const a = JSON.parse(raw.trim());
+    if (a.action === 'move' && a.location && LOCS[a.location]) {
+      agent.goTo(a.location);
+      if (a.task) agent.task = a.task;
+    } else if (a.action === 'say' && a.message) {
+      agent.status = 'talking';
+      if (a.task) agent.task = a.task;
+      addBubble(agent.id, a.message, 7000);
+      agents
+        .filter(o => o.id !== agent.id && Math.hypot(o.x-agent.x, o.y-agent.y) < 5)
+        .forEach(o => o.remember(`${agent.name} said: "${a.message}"`));
+      setTimeout(() => { if (agent.status === 'talking') agent.status = 'idle'; }, 7000);
+    } else {
+      agent.status = 'working';
+      if (a.task) agent.task = a.task;
+    }
+  } catch {
+    agent.status = 'working';
+  }
+
+  agent.isBusy = false;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  GAME LOOP
+// ═══════════════════════════════════════════════════════════
+
+async function loop(ts) {
+  if (!simRunning) return;
+  const dt = Math.min(ts - lastT, 50);
+  lastT = ts;
+
+  for (const ag of agents) ag.update(dt);
+
+  // General AI think: every 15-20 seconds
+  if (!eventBusy) {
+    for (const ag of agents) {
+      if (!ag.isBusy && !ag.activeTaskId && ag.thinkTimer > 15000 + Math.random()*5000) {
+        ag.thinkTimer = 0;
+        agentThink(ag);
+      }
+    }
+  }
+
+  // Task work fires when timer exceeds the pre-set threshold (no per-frame random)
+  for (const ag of agents) {
+    const task = ag.activeTaskId ? tasks.find(t => t.id === ag.activeTaskId) : null;
+    if (task && task.status === 'in_progress' && !ag.isBusy && ag.taskWorkTimer > ag.nextTaskWorkIn) {
+      ag.taskWorkTimer = 0;
+      ag.nextTaskWorkIn = 25000 + Math.random() * 10000; // 25-35s between updates
+      doTaskWork(ag, task);
+    }
+  }
+
+  render();
+  updateBadges();
+  requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  EVENTS
+// ═══════════════════════════════════════════════════════════
+
+async function doStandup() {
+  if (eventBusy || standupBusy) return;
+  standupBusy = eventBusy = true;
+  setButtons(true);
+  setEvent('STANDUP');
+  notify('📋 Standup! Agents heading to meeting room...');
+
+  const spots = [
+    { x:2.2, y:2.2 },
+    { x:4.5, y:2.2 },
+    { x:2.2, y:4.5 },
+    { x:4.5, y:4.5 },
+    { x:3.5, y:2.0 },
+  ];
+  agents.forEach((ag, i) => {
+    ag.status = 'in_meeting';
+    const s = spots[i % spots.length];
+    ag.tx = s.x + (Math.random()-0.5)*0.2;
+    ag.ty = s.y + (Math.random()-0.5)*0.2;
+    ag.targetLocKey = 'meeting';
+    ag.task = 'Walking to standup';
+    ag.remember('Standup meeting starting');
+  });
+
+  sysMsg('📋 All agents heading to the meeting room...');
+
+  // WAIT for all agents to physically arrive
+  const startWait = Date.now();
+  while (!agents.every(ag => ag.atTarget())) {
+    if (Date.now() - startWait > 12000) break;
+    await wait(150);
+  }
+  await wait(600);
+
+  sysMsg('🎙️ Standup in session. Each agent will share their update.');
+
+  const prev = [];
+  for (const ag of agents) {
+    await wait(800);
+    sysMsg(`💬 ${ag.name} (${ag.role})...`);
+    ag.isBusy = true;
+
+    try {
+      const taskCtx = ag.activeTaskId
+        ? `Currently assigned task: ${tasks.find(t => t.id === ag.activeTaskId)?.title}`
+        : 'No specific task assigned';
+      const prevStr = prev.length
+        ? `Others said: ${prev.map(p => `${p.n}: ${p.u}`).join(' | ')}`
+        : 'You are first to speak.';
+
+      const sys = `You are ${ag.name}, ${ag.role} at AgentCo. Personality: ${ag.personality}
+AgentCo builds an AI-powered dev toolchain. You're in a standup. Be specific to your role.
+${taskCtx}
+${prevStr}
+Give: what you did yesterday, what you're doing today, any blockers. 2-3 sentences max, 120 chars total. Conversational.`;
+
+      const update = (await claude(sys, 'Your standup update:', 160)).trim().replace(/^"|"$/g,'');
+      prev.push({ n: ag.name, u: update });
+      ag.status = 'talking';
+      addBubble(ag.id, update, 9000);
+      chatMsg(ag.name, update, ag.hue, 'agent');
+      agents.filter(o => o.id !== ag.id).forEach(o => o.remember(`${ag.name} standup: ${update}`));
+    } catch(e) {
+      console.error('Standup error for', ag.name, e);
+      chatMsg(ag.name, `[error: ${e.message}]`, '#ff4444', 'system');
+    }
+
+    ag.isBusy = false;
+    await wait(8000);
+    ag.status = 'in_meeting';
+  }
+
+  await wait(1000);
+  sysMsg('✅ Standup done! Great sync everyone.');
+  notify('✅ Standup complete!');
+  setEvent('');
+
+  agents.forEach(ag => {
+    ag.status = 'idle';
+    const key = LOCS[`desk_${ag.id}`] ? `desk_${ag.id}` : 'desk_alex';
+    ag.goTo(key);
+  });
+
+  standupBusy = eventBusy = false;
+  setButtons(false);
+}
+
+async function doBreak() {
+  if (eventBusy) return;
+  eventBusy = true;
+  setButtons(true);
+  notify('☕ Break time! Agents heading out...');
+  setEvent('BREAK TIME');
+
+  const spots = ['coffee', 'coffee', 'lounge', 'lounge', 'lounge'];
+  agents.forEach((ag, i) => {
+    ag.goTo(spots[i % spots.length]);
+    ag.remember('Team taking a break');
+  });
+
+  sysMsg('☕ Break time! Agents heading to the break room and lounge...');
+
+  // Wait for agents to reach their spots
+  const t0 = Date.now();
+  while (!agents.every(ag => ag.atTarget())) {
+    if (Date.now() - t0 > 10000) break;
+    await wait(150);
+  }
+  await wait(400);
+
+  // Agents chat during break
+  for (const ag of agents.slice(0, 3)) {
+    try {
+      const sys = `You are ${ag.name}, ${ag.role}. You're on a coffee break with coworkers. Say something casual, funny, or relatable. Max 60 chars. Personality: ${ag.personality}`;
+      const txt = (await claude(sys, 'What do you say?', 80)).trim().replace(/^"|"$/g,'');
+      addBubble(ag.id, txt, 7000);
+      chatMsg(ag.name, txt, ag.hue, 'agent');
+    } catch {}
+    await wait(2500);
+  }
+
+  await wait(8000);
+  sysMsg('🔔 Break over! Agents heading back to work.');
+  setEvent('');
+  eventBusy = false;
+  setButtons(false);
+
+  agents.forEach(ag => {
+    const key = LOCS[`desk_${ag.id}`] ? `desk_${ag.id}` : 'desk_alex';
+    ag.goTo(key);
+    ag.status = 'working';
+  });
+}
+
+async function doFocus() {
+  if (eventBusy) return;
+  notify('🎯 Focus mode! Back to desks.');
+  setEvent('FOCUS TIME');
+  agents.forEach(ag => {
+    const key = LOCS[`desk_${ag.id}`] ? `desk_${ag.id}` : 'desk_alex';
+    ag.goTo(key);
+    ag.status = 'working';
+    ag.task = 'Deep focus';
+    ag.remember('Focus session started');
+  });
+  await wait(3000);
+  setEvent('');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  VOICE INPUT (ElevenLabs STT)
+// ═══════════════════════════════════════════════════════════
+
+let _mediaRecorder = null;
+let _audioChunks = [];
+let _voiceActive = false;
+
+async function startVoice(e) {
+  e.preventDefault();
+  if (_voiceActive) return;
+
+  const btn = document.getElementById('mic-btn');
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    sysMsg('⚠️ Mic permission denied');
+    return;
+  }
+
+  _voiceActive = true;
+  _audioChunks = [];
+  btn.classList.add('recording');
+  document.getElementById('mic-wrap').classList.add('active');
+  document.getElementById('mic-label').textContent = 'RELEASE TO SEND';
+  const icon = document.getElementById('mic-icon');
+  if (icon) icon.setAttribute('stroke', '#ff6666');
+
+  // Prefer webm/opus; fall back to whatever the browser supports
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    ? 'audio/webm;codecs=opus'
+    : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+
+  _mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+  _mediaRecorder.ondataavailable = e => { if (e.data.size > 0) _audioChunks.push(e.data); };
+  _mediaRecorder.onstop = () => stream.getTracks().forEach(t => t.stop());
+  _mediaRecorder.start();
+}
+
+async function stopVoice() {
+  if (!_voiceActive || !_mediaRecorder) return;
+  _voiceActive = false;
+
+  const btn = document.getElementById('mic-btn');
+  btn.classList.remove('recording');
+  btn.classList.add('transcribing');
+  document.getElementById('mic-label').textContent = 'TRANSCRIBING…';
+  const icon2 = document.getElementById('mic-icon');
+  if (icon2) icon2.setAttribute('stroke', '#4466cc');
+
+  _mediaRecorder.stop();
+
+  // Wait for final ondataavailable
+  await new Promise(r => setTimeout(r, 150));
+
+  if (_audioChunks.length === 0) {
+    btn.classList.remove('transcribing');
+    document.getElementById('mic-wrap').classList.remove('active');
+    document.getElementById('mic-label').textContent = 'HOLD TO SPEAK';
+    const iconX = document.getElementById('mic-icon');
+    if (iconX) iconX.setAttribute('stroke', '#8888cc');
+    return;
+  }
+
+  try {
+    const blob = new Blob(_audioChunks, { type: _mediaRecorder.mimeType || 'audio/webm' });
+    const formData = new FormData();
+    formData.append('audio', blob, 'voice.webm');
+
+    const res = await fetch('/api/transcribe', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if (data.error) throw new Error(data.error);
+
+    const text = (data.text || '').trim();
+    if (text) {
+      // Put transcript in input and send
+      const input = document.getElementById('chat-input');
+      input.value = text;
+      sysMsg(`🎤 "${text}"`);
+      sendMsg();
+    }
+  } catch (e) {
+    sysMsg(`⚠️ Voice error: ${e.message}`);
+  } finally {
+    btn.classList.remove('transcribing');
+    document.getElementById('mic-wrap').classList.remove('active');
+    document.getElementById('mic-label').textContent = 'HOLD TO SPEAK';
+    const icon3 = document.getElementById('mic-icon');
+    if (icon3) icon3.setAttribute('stroke', '#8888cc');
+    _audioChunks = [];
+    _mediaRecorder = null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CHAT & TASK ROUTING
+// ═══════════════════════════════════════════════════════════
+
+const TASK_RE = /\b(research|implement|build|create|fix|test|design|investigate|analyze|review|write|document|check|explore|figure out|look into|make|develop|set up|configure|optimize)\b/i;
+
+async function sendMsg() {
+  const el = document.getElementById('chat-input');
+  const msg = el.value.trim();
+  if (!msg || !simRunning) return;
+  el.value = '';
+
+  // Slash commands
+  if (msg === '/standup') { chatMsg('You', msg, '#cccfff', 'user'); doStandup(); return; }
+  if (msg === '/break')   { chatMsg('You', msg, '#cccfff', 'user'); doBreak();   return; }
+  if (msg === '/focus')   { chatMsg('You', msg, '#cccfff', 'user'); doFocus();   return; }
+
+  chatMsg('You', msg, '#cccfff', 'user');
+
+  // Fitness messages → Max
+  const maxAgent = agents.find(a => a.id === 'max');
+  if (maxAgent && FITNESS_RE.test(msg)) {
+    handleFitnessMessage(msg, maxAgent);
+    return;
+  }
+
+  // Name detection: "@Alex ...", "Alex, ...", "Alex: ...", "Alex ..."
+  // Works with or without @ prefix
+  const nameMatch = msg.match(/^@?([A-Za-z]+)[,:\s]+(.{2,})$/i);
+  const namedAgent = nameMatch
+    ? agents.find(a => a.name.toLowerCase() === nameMatch[1].toLowerCase())
+    : null;
+
+  if (namedAgent) {
+    const rest = nameMatch[2].trim();
+    if (TASK_RE.test(rest)) {
+      createTask(rest, namedAgent.id);
+    } else {
+      namedAgent.remember(`Manager said to you: "${rest}"`);
+      try {
+        const sys = `You are ${namedAgent.name}, ${namedAgent.role}. Reply to your manager: 1-2 sentences, max 90 chars. Personality: ${namedAgent.personality}. Currently: ${namedAgent.task}.`;
+        const reply = (await claude(sys, rest, 110)).trim().replace(/^"|"$/g,'');
+        addBubble(namedAgent.id, reply, 7000);
+      } catch (e) {
+        sysMsg(`⚠️ ${namedAgent.name} reply error: ${e.message}`);
+        addBubble(namedAgent.id, 'On it!', 3000);
+      }
+    }
+    return;
+  }
+
+  // Task detection (no @mention)
+  if (TASK_RE.test(msg)) {
+    createTask(msg);
+    return;
+  }
+
+  // Regular broadcast chat
+  agents.forEach(ag => ag.remember(`Manager: "${msg}"`));
+  const responder = agents[Math.floor(Math.random() * agents.length)];
+  try {
+    const sys = `You are ${responder.name}, ${responder.role}. Reply casually to your manager, 1 sentence, max 75 chars. Personality: ${responder.personality}`;
+    const reply = (await claude(sys, msg, 90)).trim().replace(/^"|"$/g,'');
+    addBubble(responder.id, reply, 6000);
+  } catch { addBubble(responder.id, 'Heard!', 2000); }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  UI HELPERS
+// ═══════════════════════════════════════════════════════════
+
+function addBubble(id, text, dur = 6000) {
+  bubbles = bubbles.filter(b => b.agentId !== id);
+  bubbles.push({ agentId: id, text, expiry: Date.now() + dur });
+}
+
+function chatMsg(sender, text, color, type) {
+  const log = document.getElementById('chat-log');
+  const d = document.createElement('div');
+  d.className = `chat-msg ${type}`;
+  d.innerHTML = `<div class="msg-sender" style="color:${color}">${sender}</div><div class="msg-text">${text}</div>`;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+function sysMsg(t) { chatMsg('System', t, '#6666bb', 'system'); }
+
+function switchTab(tab) {
+  ['chat','tasks','fitness'].forEach(t => {
+    const panel = document.getElementById(`panel-${t}`);
+    const btn   = document.getElementById(`tab-btn-${t}`);
+    if (panel) panel.style.display = t === tab ? 'flex' : 'none';
+    if (btn)   btn.classList.toggle('active', t === tab);
+  });
+  if (tab === 'fitness') refreshFitnessPanel();
+}
+
+function updateTaskPanel() {
+  const el  = document.getElementById('task-list');
+  const cnt = document.getElementById('task-count');
+  const active = tasks.filter(t => t.status === 'in_progress').length;
+  cnt.textContent = active ? `(${active})` : '';
+
+  if (!tasks.length) {
+    el.innerHTML = '<div style="padding:16px;opacity:0.4;font-size:12px">No tasks yet.</div>';
+    return;
+  }
+
+  el.innerHTML = [...tasks].reverse().map(t => {
+    const ag = agents.find(a => a.id === t.assigneeId);
+    const latestUpdate = t.updates[t.updates.length - 1] || 'Starting...';
+    const icon = t.status === 'done' ? '✅' : '⟳';
+    const age  = Math.floor((Date.now() - t.createdAt) / 60000);
+    return `<div class="task-item ${t.status}">
+      <div class="task-header">
+        <span class="task-icon">${icon}</span>
+        <span class="task-title">${t.title}</span>
+      </div>
+      <div class="task-meta">
+        <span style="color:${ag?.hue||'#888'}">${ag?.name||'?'}</span>
+        <span class="task-age">${age}m ago</span>
+      </div>
+      <div class="task-update">${latestUpdate}</div>
+      ${t.updates.length > 1
+        ? `<details><summary style="font-size:10px;opacity:0.5;cursor:pointer">${t.updates.length} updates</summary><div class="task-history">${t.updates.map((u,i) => `<div class="update-item">#${i+1}: ${u}</div>`).join('')}</div></details>`
+        : ''}
+    </div>`;
+  }).join('');
+}
+
+function updateBadges() {
+  document.getElementById('agent-badges').innerHTML = agents.map(ag => `
+    <div class="agent-badge">
+      <div class="agent-dot" style="background:${['working','in_meeting','talking'].includes(ag.status) ? ag.hue : '#444'}"></div>
+      <span style="color:${ag.hue}">${ag.name}</span>
+      <span style="opacity:0.45;font-size:10px">${ag.status}</span>
+    </div>`).join('');
+}
+
+function notify(msg) {
+  const el = document.getElementById('notif');
+  el.textContent = msg;
+  el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 3000);
+}
+
+function setEvent(txt) {
+  const el = document.getElementById('event-badge');
+  if (txt) { el.textContent = txt; el.classList.add('show'); }
+  else { el.classList.remove('show'); }
+}
+
+function setButtons(disabled) {
+  ['btn-standup','btn-break','btn-focus'].forEach(id => {
+    document.getElementById(id).disabled = disabled;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FITNESS AGENT
+// ═══════════════════════════════════════════════════════════
+
+const FITNESS_RE = /\b(workout|ran|run|running|lifted|gym|weights|chest|legs|arms|shoulders|back|cardio|squat|bench|deadlift|pushup|pullup|miles|km|kilometer|sprint|jog|ate|eat|eaten|had|protein|calories|calorie|carbs|macros|meal|food|chicken|rice|eggs|oats|shake|nutrition|fitness|show.?grid|log|progress|diary|intake|burned|burned|macros|what.*i.*eat|how.*many.*cal|what.*did.*i|show.*my|today.*workout|workout.*today|how.*am.*i.*doing|did.*i.*eat|my.*food|my.*calories|my.*nutrition)\b/i;
+
+async function sendFitnessMsg() {
+  const el = document.getElementById('fitness-input');
+  const msg = el.value.trim();
+  if (!msg || !simRunning) return;
+  el.value = '';
+  const max = agents.find(a => a.id === 'max');
+  if (max) handleFitnessMessage(msg, max);
+}
+
+async function quickLog(type) {
+  const max = agents.find(a => a.id === 'max');
+  if (!max || !simRunning) return;
+  const msgs = {
+    weights: 'I did a weights session today',
+    running: 'I went for a run today',
+    ateWell: 'I ate well today',
+    show:    'show my fitness grid',
+  };
+  if (msgs[type]) handleFitnessMessage(msgs[type], max);
+}
+
+async function handleFitnessMessage(msg, maxAgent) {
+  maxAgent.goTo('gym');
+  maxAgent.isBusy = true;
+  maxAgent.status = 'working';
+  maxAgent.task = 'Processing fitness log...';
+
+  // Switch to fitness tab
+  switchTab('fitness');
+
+  try {
+    const r = await fetch('/api/fitness/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg }),
+    });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+
+    if (data.response) {
+      addBubble(maxAgent.id, data.response, 9000);
+      chatMsg(maxAgent.name, data.response, maxAgent.hue, 'agent');
+    }
+
+    if (data.logged) {
+      const dateLabel = data.targetDate && data.targetDate !== new Date().toISOString().slice(0,10)
+        ? ` for ${data.targetDate}` : '';
+      sysMsg(`✅ Logged by Max${dateLabel}`);
+      await refreshFitnessPanel();
+    } else if (data.intent === 'check_progress') {
+      await refreshFitnessPanel();
+    }
+
+    if (data.addNutrition) {
+      sysMsg(`🥗 Saved "${data.addNutrition.name}" to nutrition DB`);
+    }
+
+    if (data.openGrid) {
+      window.open('http://localhost:5173', '_blank');
+      sysMsg('📊 Opened fitness grid');
+    }
+
+    maxAgent.status = 'idle';
+    maxAgent.task = 'At the gym';
+  } catch (e) {
+    sysMsg(`⚠️ Max error: ${e.message}`);
+    addBubble(maxAgent.id, "Sorry, couldn't log that right now!", 5000);
+    maxAgent.status = 'idle';
+  }
+
+  maxAgent.isBusy = false;
+}
+
+async function refreshFitnessPanel() {
+  // Check if fitness API is online
+  let online = false;
+  try {
+    const s = await fetch('/api/fitness/status');
+    const sd = await s.json();
+    online = sd.online;
+  } catch {}
+
+  const dot  = document.getElementById('max-status-dot');
+  const stxt = document.getElementById('max-status-text');
+  if (dot) dot.className = online ? 'max-online' : 'max-online max-offline';
+  if (stxt) stxt.textContent = online ? 'Fitness API connected' : 'Fitness API offline — start with: cd ~/fitness-app && bun run dev';
+
+  if (!online) return;
+
+  // Today
+  try {
+    const r  = await fetch('/api/fitness/today');
+    const td = await r.json();
+    renderTodayCard(td);
+  } catch {}
+
+  // Week
+  try {
+    const r   = await fetch('/api/fitness/week');
+    const wk  = await r.json();
+    renderWeekGrid(wk);
+  } catch {}
+}
+
+function renderTodayCard(td) {
+  const sq   = document.getElementById('fsq-main');
+  const stxt = document.getElementById('fitness-status-text');
+  const notesEl = document.getElementById('fitness-notes-preview');
+  const dateEl  = document.getElementById('fitness-date');
+  if (!sq) return;
+
+  const today = new Date().toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+  if (dateEl) dateEl.textContent = `— ${today}`;
+
+  if (!td) {
+    sq.className = 'fitness-square';
+    sq.textContent = '—';
+    if (stxt) stxt.textContent = 'No activity yet today';
+    if (notesEl) notesEl.textContent = '';
+    document.getElementById('macro-bars').innerHTML = '';
+    return;
+  }
+
+  const w = td.weights, run = td.running, ate = td.ateWell;
+  sq.className = 'fitness-square' + (w && run ? ' both' : w ? ' weights' : run ? ' running' : '') + (ate ? ' ate-well-ring' : '');
+  sq.textContent = w && run ? '💜' : w ? '🏋️' : run ? '🏃' : ate ? '🥗' : '—';
+  if (stxt) stxt.textContent = [w && 'Weights', run && 'Running', ate && 'Ate well'].filter(Boolean).join(' · ') || 'Rest day';
+  if (notesEl) notesEl.textContent = td.notes ? td.notes.slice(0, 80) + (td.notes.length > 80 ? '…' : '') : '';
+
+  const goals = { calories: 2200, protein: 150, carbs: 250, fat: 70 };
+  const macros = [
+    { label: 'Calories', val: td.calories || 0, goal: goals.calories, unit: 'kcal', color: '#ff8c42' },
+    { label: 'Protein',  val: td.protein  || 0, goal: goals.protein,  unit: 'g',    color: '#4A90E2' },
+    { label: 'Carbs',    val: td.carbs    || 0, goal: goals.carbs,    unit: 'g',    color: '#4AE280' },
+    { label: 'Fat',      val: td.fat      || 0, goal: goals.fat,      unit: 'g',    color: '#E2784A' },
+  ];
+  const barsEl = document.getElementById('macro-bars');
+  if (barsEl) barsEl.innerHTML = macros.map(m => {
+    const pct = Math.min(100, Math.round((m.val / m.goal) * 100));
+    return `<div class="macro-bar-row">
+      <span class="macro-label">${m.label}</span>
+      <div class="macro-track"><div class="macro-fill" style="width:${pct}%;background:${m.color}"></div></div>
+      <span class="macro-val">${m.val}${m.unit}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderWeekGrid(week) {
+  const el = document.getElementById('week-grid');
+  if (!el || !week) return;
+  const days = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  el.innerHTML = [...week].reverse().map(d => {
+    const date = new Date(d.date + 'T12:00:00');
+    const day  = days[date.getDay()];
+    const cls  = d.weights && d.running ? 'both' : d.weights ? 'weights' : d.running ? 'running' : '';
+    const ate  = d.ateWell ? ' ate-well' : '';
+    const icon = d.weights && d.running ? '💜' : d.weights ? '🏋️' : d.running ? '🏃' : '';
+    return `<div class="week-cell ${cls}${ate}" title="${d.date}">
+      <div class="wc-dot">${icon}</div>
+      <div class="wc-day">${day}</div>
+    </div>`;
+  }).join('');
+}
+
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ═══════════════════════════════════════════════════════════
+//  STARTUP
+// ═══════════════════════════════════════════════════════════
+
+async function init() {
+  // Check if server is running
+  try {
+    const r = await fetch('/api/status');
+    const s = await r.json();
+    if (!s.keyLoaded) {
+      showKeyOverlay();
+      return;
+    }
+  } catch {
+    document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#ff6666;font-family:monospace;text-align:center;background:#0a0a18">
+      <div><h2>⚠️ Server Not Running</h2>
+      <p style="margin-top:12px;opacity:0.7">cd ai-office && npm start</p></div></div>`;
+    return;
+  }
+  startAgents();
+}
+
+function showKeyOverlay() {
+  const overlay = document.createElement('div');
+  overlay.id = 'key-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(5,5,20,0.95);display:flex;align-items:center;justify-content:center;z-index:100;font-family:Courier New,monospace';
+  overlay.innerHTML = `
+    <div style="background:#12122a;border:1px solid #3a3a7a;border-radius:14px;padding:36px 40px;text-align:center;max-width:440px;width:90%">
+      <div style="color:#8888ff;font-size:18px;font-weight:bold;letter-spacing:2px;margin-bottom:10px">AGENT HQ</div>
+      <p style="font-size:13px;opacity:0.6;margin-bottom:20px;line-height:1.5">
+        Enter your Anthropic API key to start.<br>
+        <span style="opacity:0.5;font-size:11px">Key is stored server-side only — never persisted to disk.</span>
+      </p>
+      <input id="key-input" type="password" placeholder="sk-ant-..."
+        style="width:100%;background:#1a1a35;border:1px solid #3a3a7a;border-radius:7px;color:#e0e0e0;padding:11px 13px;font-size:13px;font-family:inherit;outline:none;margin-bottom:12px"
+        onkeydown="if(event.key==='Enter')submitKey()" />
+      <button onclick="submitKey()"
+        style="width:100%;background:#28286a;border:1px solid #6666cc;color:#e0e0e0;padding:10px;border-radius:7px;cursor:pointer;font-family:inherit;font-size:13px">
+        Launch Simulation →
+      </button>
+      <div id="key-error" style="color:#ff6666;font-size:11px;margin-top:8px;display:none"></div>
+      <p style="font-size:10px;opacity:0.3;margin-top:12px">Or restart server after adding key to .env file</p>
+    </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('key-input')?.focus(), 100);
+}
+
+async function submitKey() {
+  const input = document.getElementById('key-input');
+  const errEl = document.getElementById('key-error');
+  const key = input?.value.trim();
+  if (!key || !key.startsWith('sk-')) {
+    if (errEl) { errEl.textContent = 'Key must start with sk-'; errEl.style.display = 'block'; }
+    return;
+  }
+  try {
+    const r = await fetch('/api/setkey', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    document.getElementById('key-overlay')?.remove();
+    startAgents();
+  } catch(e) {
+    if (errEl) { errEl.textContent = e.message; errEl.style.display = 'block'; }
+  }
+}
+
+function startAgents() {
+  agents = AGENT_DEFS.map(d => new Agent(d));
+  simRunning = true;
+  sysMsg('🚀 Agents are live! Type a message, assign tasks, or click Standup.');
+  refreshFitnessPanel();
+  sysMsg('💡 Try: "research Claude Code hooks" or "@Alex build the login UI"');
+  sysMsg('Tip: @Name to address someone directly · /standup · /break · /focus');
+  requestAnimationFrame(loop);
+}
+
+// Preview render before sim starts
+requestAnimationFrame(function preview(ts) {
+  lastT = ts;
+  render();
+  if (!simRunning) requestAnimationFrame(preview);
+});
+
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
