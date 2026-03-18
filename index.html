@@ -69,7 +69,6 @@
     #canvas-wrap {
       flex: 1;
       position: relative;
-      overflow: hidden;
       background: #0a0a18;
     }
     #canvas-wrap canvas { display: block; width: 100% !important; height: 100% !important; }
@@ -78,7 +77,6 @@
       top: 0; left: 0;
       width: 100%; height: 100%;
       pointer-events: none;
-      overflow: hidden;
     }
 
     /* ── RIGHT PANEL ── */
@@ -640,23 +638,25 @@ function setupThree() {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 2.2;
   wrap.insertBefore(renderer.domElement, wrap.firstChild);
 
   // CSS2D Renderer for labels/bubbles
   labelRenderer = new CSS2DRenderer();
   labelRenderer.setSize(wrap.clientWidth, wrap.clientHeight);
-  labelRenderer.domElement.id = 'label-renderer';
   labelRenderer.domElement.style.position = 'absolute';
   labelRenderer.domElement.style.top = '0';
   labelRenderer.domElement.style.left = '0';
+  labelRenderer.domElement.style.width = '100%';
+  labelRenderer.domElement.style.height = '100%';
   labelRenderer.domElement.style.pointerEvents = 'none';
+  labelRenderer.domElement.style.overflow = 'visible';
   wrap.appendChild(labelRenderer.domElement);
 
   // Scene
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a0a18);
-  scene.fog = new THREE.FogExp2(0x0a0a18, 0.018);
+  scene.background = new THREE.Color(0x1a1a2e);
+  scene.fog = new THREE.FogExp2(0x1a1a2e, 0.012);
 
   // Camera
   const aspect = wrap.clientWidth / wrap.clientHeight;
@@ -672,33 +672,38 @@ function setupThree() {
   controls.minDistance = 12;
   controls.maxDistance = 70;
 
-  // Lighting
-  const ambient = new THREE.AmbientLight(0x334466, 0.5);
+  // Lighting — bright open-office feel
+  const ambient = new THREE.AmbientLight(0xaabbff, 1.8);
   scene.add(ambient);
 
-  const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
   dirLight.position.set(15, 30, 20);
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.width = 2048;
   dirLight.shadow.mapSize.height = 2048;
   dirLight.shadow.camera.near = 0.5;
   dirLight.shadow.camera.far = 100;
-  dirLight.shadow.camera.left = -25;
-  dirLight.shadow.camera.right = 25;
-  dirLight.shadow.camera.top = 25;
-  dirLight.shadow.camera.bottom = -25;
+  dirLight.shadow.camera.left = -30;
+  dirLight.shadow.camera.right = 30;
+  dirLight.shadow.camera.top = 30;
+  dirLight.shadow.camera.bottom = -30;
   scene.add(dirLight);
 
-  // 4 ceiling point lights
-  const ceilPositions = [[-10, 6, -8], [10, 6, -8], [-10, 6, 8], [10, 6, 8]];
+  // Fill light from opposite side
+  const fillLight = new THREE.DirectionalLight(0x8899ff, 1.0);
+  fillLight.position.set(-15, 20, -15);
+  scene.add(fillLight);
+
+  // 6 ceiling point lights — bright white office strips
+  const ceilPositions = [[-8,8,-6],[0,8,-6],[8,8,-6],[-8,8,6],[0,8,6],[8,8,6]];
   ceilPositions.forEach(([cx, cy, cz]) => {
-    const pl = new THREE.PointLight(0x9999ff, 0.4, 12);
+    const pl = new THREE.PointLight(0xddeeff, 1.2, 18);
     pl.position.set(cx, cy, cz);
     scene.add(pl);
   });
 
-  // Gym area point light
-  const gymLight = new THREE.PointLight(0xff6633, 0.3, 8);
+  // Gym accent light — orange/warm
+  const gymLight = new THREE.PointLight(0xff8844, 1.0, 10);
   gymLight.position.set(10, 5, -8);
   scene.add(gymLight);
 }
@@ -718,18 +723,18 @@ function buildFloor() {
   for (let x = 0; x < GW; x++) {
     for (let y = 0; y < GH; y++) {
       const geo = new THREE.BoxGeometry(TS - 0.04, 0.1, TS - 0.04);
-      let color = 0x1a1a2e;
-      let roughness = 0.85;
+      let color = 0x2e2e4a;
+      let roughness = 0.7;
 
       if (x >= 15 && y <= 6) {
-        color = 0x0d1117; roughness = 0.95; // gym
+        color = 0x1a1a22; roughness = 0.9; // gym — dark rubber
       } else if (x <= 5 && y <= 7) {
-        color = 0x16213e; roughness = 0.9; // meeting
+        color = 0x223355; roughness = 0.75; // meeting — blue carpet
       } else if (x <= 3) {
-        color = 0x0f1a0f; roughness = 0.9; // server
+        color = 0x152215; roughness = 0.85; // server — green-tinted
       }
 
-      const mat = new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.1 });
+      const mat = new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.15 });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.receiveShadow = true;
       const pos = tileToWorld(x + 0.5, y + 0.5);
@@ -740,7 +745,7 @@ function buildFloor() {
 }
 
 function buildWalls() {
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0x1a1a35, roughness: 0.8, metalness: 0.2 });
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x3a3a5a, roughness: 0.7, metalness: 0.2 });
   const wallH = 2.5;
   const wallT = 0.15;
 
@@ -1890,21 +1895,34 @@ async function sendMsg() {
     return;
   }
 
+  // Primary: name at start — "Max, how are you?" or "max do this"
   const nameMatch = msg.match(/^@?([A-Za-z]+)[,:\s]+(.{2,})$/i);
-  const namedAgent = nameMatch
+  let namedAgent = nameMatch
     ? agents.find(a => a.name.toLowerCase() === nameMatch[1].toLowerCase())
     : null;
+  let namedRest = nameMatch?.[2]?.trim() || msg;
+
+  // Fallback: name appears anywhere — "hey Max how are you?" or "what's up Jordan"
+  if (!namedAgent) {
+    for (const ag of agents) {
+      if (new RegExp(`\\b${ag.name}\\b`, 'i').test(msg)) {
+        namedAgent = ag;
+        namedRest = msg;
+        break;
+      }
+    }
+  }
 
   if (namedAgent) {
-    const rest = nameMatch[2].trim();
-    if (TASK_RE.test(rest)) {
-      createTask(rest, namedAgent.id);
+    if (TASK_RE.test(namedRest)) {
+      createTask(namedRest, namedAgent.id);
     } else {
-      namedAgent.remember(`Manager said to you: "${rest}"`);
+      namedAgent.remember(`Manager said to you: "${namedRest}"`);
       try {
         const sys = `You are ${namedAgent.name}, ${namedAgent.role}. Reply to your manager: 1-2 sentences, max 90 chars. Personality: ${namedAgent.personality}. Currently: ${namedAgent.task}.`;
-        const reply = (await claude(sys, rest, 110)).trim().replace(/^"|"$/g,'');
+        const reply = (await claude(sys, namedRest, 110)).trim().replace(/^"|"$/g,'');
         addBubble(namedAgent.id, reply, 7000);
+        chatMsg(namedAgent.name, reply, namedAgent.hue, 'agent');
       } catch (e) {
         sysMsg(`⚠️ ${namedAgent.name} reply error: ${e.message}`);
         addBubble(namedAgent.id, 'On it!', 3000);
@@ -1924,6 +1942,7 @@ async function sendMsg() {
     const sys = `You are ${responder.name}, ${responder.role}. Reply casually to your manager, 1 sentence, max 75 chars. Personality: ${responder.personality}`;
     const reply = (await claude(sys, msg, 90)).trim().replace(/^"|"$/g,'');
     addBubble(responder.id, reply, 6000);
+    chatMsg(responder.name, reply, responder.hue, 'agent');
   } catch { addBubble(responder.id, 'Heard!', 2000); }
 }
 
