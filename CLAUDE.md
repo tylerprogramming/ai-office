@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-A real-time 3D office simulation where AI agents autonomously move, work, chat, and collaborate. Built with Three.js (WebGL), Express, OpenAI, and ElevenLabs. Agents are powered by GPT and respond to natural language via chat or voice.
+A real-time 3D office simulation of a **YouTube content production team**. AI agents autonomously move, work, chat, and handle real YouTube production tasks. Built with Three.js (WebGL), Express, OpenAI, and ElevenLabs. Agents respond to natural language via chat or voice and can run actual YouTube skills.
 
 ## Stack
 
@@ -28,6 +28,8 @@ OPENAI_API_KEY=       # Required — OpenAI key
 OPENAI_MODEL=         # Default: gpt-4o-mini (supports gpt-5-* reasoning models)
 ELEVENLABS_API_KEY=   # Required for voice STT
 PORT=                 # Default: 3000
+KIE_API_KEY=          # Optional — enables real thumbnail generation via Kie.ai
+BLOTATO_API_KEY=      # Optional — enables real social media publishing via Blotato
 ```
 
 ## Architecture
@@ -45,9 +47,17 @@ All AI calls are proxied through Express — the browser never holds an API key.
 | `GET /api/fitness/today` | Today's activity from fitness app |
 | `GET /api/fitness/week` | Last 7 days of activity |
 | `POST /api/fitness/action` | LLM parses fitness message → merges with today's data → logs to fitness app |
+| `POST /api/skill/script` | Alex: generates 3 titles, 3 hooks, script outline from a topic |
+| `POST /api/skill/thumbnail` | Sam: generates thumbnail concept + optional Kie.ai image |
+| `POST /api/skill/research` | Jordan: trend research + saves idea to ~/youtube/video-ideas.md |
+| `POST /api/skill/seo` | Casey: 5 SEO-optimized titles with scorecards, description, 15 tags |
+| `POST /api/skill/repurpose` | Riley: 3 Shorts scripts, LinkedIn post, 5 tweets, Instagram caption |
+| `POST /api/skill/post` | Casey: format + optionally publish via Blotato API |
+
+All skill endpoints return `{ summary, response, files? }`.
 
 ### `index.html`
-Single-file frontend (~2300 lines). Key sections:
+Single-file frontend (~2400 lines). Key sections:
 
 **Three.js Scene**
 - `setupThree()` — renderer, camera (PerspectiveCamera 50°), OrbitControls, lighting
@@ -64,8 +74,8 @@ Single-file frontend (~2300 lines). Key sections:
 - `AGENT_SPEED = 2.0` tiles/second
 
 **Agent System**
-- `AGENT_DEFS` — 6 agents: Alex (Engineer), Sam (Designer), Jordan (PM), Casey (DevOps), Riley (QA), Max (Fitness Coach)
-- `LOCS` — named locations with tile coords (desks, meeting room, gym, lounge, etc.)
+- `AGENT_DEFS` — 6 agents: Alex (Script Writer), Sam (Thumbnail Designer), Jordan (Producer), Casey (SEO Specialist), Riley (Content Repurposer), Max (Fitness Coach)
+- `LOCS` — named locations: Brainstorm Room, Story Board, Creator Lounge, desks renamed to studio roles, etc.
 - `Agent` class — handles movement lerp, timers, memory array (last 12 events)
 - Autonomous think timer fires every 15–20s → `agentThink()` → LLM returns JSON action (move/say/work)
 - Task work timer fires every 25–35s after task assigned → `doTaskWork()` → 4 progressive updates then done
@@ -74,9 +84,26 @@ Single-file frontend (~2300 lines). Key sections:
 Priority order:
 1. `/standup`, `/break`, `/focus` — slash commands
 2. `FITNESS_RE` regex match → routes to Max's `handleFitnessMessage()`
-3. Agent name anywhere in message (primary: name at start; fallback: name anywhere) → direct agent reply
-4. `TASK_RE` keyword match → `createTask()` with auto-assigned agent
-5. Fallback → random agent responds
+3. Skill regex matches → routes to skill handlers BEFORE named-agent check:
+   - `SCRIPT_RE` → Alex → `handleSkillMessage(msg, alexAgent, 'script')`
+   - `THUMBNAIL_RE` → Sam → `handleSkillMessage(msg, samAgent, 'thumbnail')`
+   - `PRODUCER_RE` → Jordan → `handleSkillMessage(msg, jordanAgent, 'research')`
+   - `POST_RE` → Casey → `handleSkillMessage(msg, caseyAgent, 'post')`
+   - `SEO_RE` → Casey → `handleSkillMessage(msg, caseyAgent, 'seo')`
+   - `REPURPOSE_RE` → Riley → `handleSkillMessage(msg, rileyAgent, 'repurpose')`
+4. Agent name anywhere in message → direct agent reply
+5. `TASK_RE` keyword match → `createTask()` with auto-assigned YouTube role agent
+6. Fallback → random YouTube team agent responds
+
+**Skill Routing Regex Constants**
+```javascript
+SCRIPT_RE    = /\b(script|plan.?video|video.?plan|hook|write.?video|outline|transcribe|research.?video|analyze.?video)\b/i
+THUMBNAIL_RE = /\b(thumbnail|make.?thumbnail|generate.?thumbnail|create.?thumbnail|design.?thumbnail)\b/i
+PRODUCER_RE  = /\b(save.?idea|video.?idea|new.?idea|what.?s.?trending|trending|yt.?search|youtube.?search|trend.?research)\b/i
+SEO_RE       = /\b(seo|optimize.?title|title.?ideas|tags|optimize.?description|keywords|ctr)\b/i
+REPURPOSE_RE = /\b(repurpose|shorts|short.?form|clips|chapters|community.?post|reels|tiktok.?from|turn.?into.?shorts)\b/i
+POST_RE      = /\b(post.?to|publish.?to|share.?on|send.?to.?twitter|send.?to.?linkedin|send.?to.?instagram)\b/i
+```
 
 **Fitness Integration**
 - `handleFitnessMessage()` → `POST /api/fitness/action` → LLM parses intent → logs to fitness API
@@ -111,12 +138,24 @@ Models matching `/^o\d|gpt-5/` get a 12× token budget multiplier because they s
 
 | Agent | Role | Personality |
 |-------|------|-------------|
-| Alex | Engineer | Methodical, loves clean code and documentation |
-| Sam | Designer | Creative, user-focused, thinks about aesthetics |
-| Jordan | PM | Organized, keeps team aligned on goals |
-| Casey | DevOps | Pragmatic, automates everything |
-| Riley | QA | Thorough, finds edge cases nobody else thinks of |
-| Max | Fitness Coach | Energetic, obsessed with gains, uses fitness emojis |
+| Alex | Script Writer | Creative storyteller obsessed with hooks, retention, and research. Nerdy about video structure. |
+| Sam | Thumbnail Designer | Pixel-perfect visual thinker. Obsessed with CTR. Always thinking about what stops the scroll. |
+| Jordan | Producer | Big-picture trend-spotter. Manages the content pipeline. Always knows what's blowing up. |
+| Casey | SEO Specialist | Data-driven optimization machine. Speaks in keywords and click-through rates. |
+| Riley | Content Repurposer | Turns one video into 20 pieces of content. Obsessed with Shorts and viral clips. |
+| Max | Fitness Coach | Energetic, obsessed with gains, uses fitness emojis. |
+
+## Skill Triggers (natural language examples)
+
+| Say this... | Routes to... | Skill |
+|-------------|-------------|-------|
+| "write a script for a video about Claude Code hooks" | Alex | `/api/skill/script` |
+| "make a thumbnail for my latest video" | Sam | `/api/skill/thumbnail` |
+| "save idea: Claude Code vs Cursor" | Jordan | `/api/skill/research` |
+| "what's trending on YouTube right now" | Jordan | `/api/skill/research` |
+| "seo optimize this title: How I Use Claude Code" | Casey | `/api/skill/seo` |
+| "repurpose my video into shorts" | Riley | `/api/skill/repurpose` |
+| "post to twitter: my new video is live" | Casey | `/api/skill/post` |
 
 ## Fitness Skill Integration
 

@@ -149,6 +149,17 @@
     .chat-msg.system { background: #181830; border: 1px solid #2a2a4a; }
     .msg-sender { font-size: 10.5px; font-weight: bold; margin-bottom: 3px; opacity: 0.8; }
     .msg-text { opacity: 0.9; }
+    .thinking-dots span {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: #6666cc; display: inline-block;
+      animation: thinkanim 0.9s ease-in-out infinite;
+    }
+    .thinking-dots span:nth-child(2) { animation-delay: 0.15s; }
+    .thinking-dots span:nth-child(3) { animation-delay: 0.30s; }
+    @keyframes thinkanim {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40%           { transform: scale(1.0); opacity: 1.0; }
+    }
 
     /* ── TASK LIST ── */
     #task-list {
@@ -537,26 +548,26 @@ const TS = 2.0; // TILE_SIZE world units
 const AGENT_SPEED = 2.0; // tiles per second
 
 const AGENT_DEFS = [
-  { id:'alex',   name:'Alex',   role:'Engineer',  hue:'#4A90E2', dark:'#1e4a8a', personality:'Methodical and detail-oriented. Loves clean code and documentation.' },
-  { id:'sam',    name:'Sam',    role:'Designer',  hue:'#E2784A', dark:'#8a3a1e', personality:'Creative and user-focused. Always thinking about aesthetics and UX.' },
-  { id:'jordan', name:'Jordan', role:'PM',        hue:'#4AE280', dark:'#1e8a48', personality:'Organized and communicative. Keeps the team aligned on goals.' },
-  { id:'casey',  name:'Casey',  role:'DevOps',    hue:'#E24A90', dark:'#8a1e50', personality:'Pragmatic and reliability-focused. Automates everything possible.' },
-  { id:'riley',  name:'Riley',  role:'QA',        hue:'#9B4AE2', dark:'#521e8a', personality:'Thorough and skeptical. Finds edge cases nobody else thinks of.' },
-  { id:'max',    name:'Max',    role:'Fitness Coach', hue:'#FF6B35', dark:'#8a2500', personality:'Energetic and motivating. Obsessed with gains, PRs, and clean eating. Uses fitness emojis naturally.' },
+  { id:'alex',   name:'Alex',   role:'Script Writer',      hue:'#4A90E2', dark:'#1e4a8a', personality:'Creative storyteller obsessed with hooks, retention, and research. Nerdy about video structure and script flow.' },
+  { id:'sam',    name:'Sam',    role:'Thumbnail Designer', hue:'#E2784A', dark:'#8a3a1e', personality:'Pixel-perfect visual thinker. Obsessed with CTR. Always thinking about what stops the scroll.' },
+  { id:'jordan', name:'Jordan', role:'Producer',           hue:'#4AE280', dark:'#1e8a48', personality:'Big-picture trend-spotter. Manages the content pipeline. Always knows what\'s blowing up on YouTube.' },
+  { id:'casey',  name:'Casey',  role:'SEO Specialist',     hue:'#E24A90', dark:'#8a1e50', personality:'Data-driven optimization machine. Speaks in keywords and click-through rates. Loves a good title scorecard.' },
+  { id:'riley',  name:'Riley',  role:'Content Repurposer', hue:'#9B4AE2', dark:'#521e8a', personality:'Turns one video into 20 pieces of content. Obsessed with Shorts and viral clips. Master of repurposing.' },
+  { id:'max',    name:'Max',    role:'Fitness Coach',      hue:'#FF6B35', dark:'#8a2500', personality:'Energetic and motivating. Obsessed with gains, PRs, and clean eating. Uses fitness emojis naturally.' },
 ];
 
 const LOCS = {
-  meeting:     { x:3.5, y:3.5, label:'Meeting Room' },
-  coffee:      { x:18,  y:2,   label:'Break Room'   },
-  lounge:      { x:17,  y:11,  label:'Lounge'       },
-  whiteboard:  { x:13,  y:6,   label:'Whiteboard'   },
-  desk_alex:   { x:6,   y:5,   label:"Alex's Desk"  },
-  desk_sam:    { x:9,   y:5,   label:"Sam's Desk"   },
-  desk_jordan: { x:12,  y:5,   label:"Jordan's Desk"},
-  desk_casey:  { x:6,   y:9,   label:"Casey's Desk" },
-  desk_riley:  { x:9,   y:9,   label:"Riley's Desk" },
-  desk_max:    { x:18,  y:4,   label:"Max's Station" },
-  gym:         { x:17,  y:4,   label:'Gym'           },
+  meeting:     { x:3.5, y:3.5, label:'Brainstorm Room'        },
+  coffee:      { x:18,  y:2,   label:'Break Room'             },
+  lounge:      { x:17,  y:11,  label:'Creator Lounge'         },
+  whiteboard:  { x:13,  y:6,   label:'Story Board'            },
+  desk_alex:   { x:6,   y:5,   label:"Alex's Script Desk"     },
+  desk_sam:    { x:9,   y:5,   label:"Sam's Design Station"   },
+  desk_jordan: { x:12,  y:5,   label:"Jordan's Producer Desk" },
+  desk_casey:  { x:6,   y:9,   label:"Casey's Analytics Desk" },
+  desk_riley:  { x:9,   y:9,   label:"Riley's Edit Bay"       },
+  desk_max:    { x:18,  y:4,   label:"Max's Station"          },
+  gym:         { x:17,  y:4,   label:'Gym'                    },
 };
 
 // Furniture: [type, x, y]
@@ -1438,19 +1449,10 @@ async function claude(system, user, maxTokens = 200) {
 //  TASK SYSTEM
 // ═══════════════════════════════════════════════════════════
 
-function pickBestAgent(desc) {
-  const d = desc.toLowerCase();
-  if (/design|ui|ux|visual|layout|figma|color|style/.test(d))         return agents.find(a => a.role==='Designer');
-  if (/test|qa|bug|quality|coverage|regression/.test(d))               return agents.find(a => a.role==='QA');
-  if (/deploy|ci|cd|infra|server|docker|aws|monitor|pipeline/.test(d)) return agents.find(a => a.role==='DevOps');
-  if (/plan|roadmap|sprint|priorit|stakeholder|deadline|scope/.test(d)) return agents.find(a => a.role==='PM');
-  return agents.find(a => a.role==='Engineer');
-}
-
 async function createTask(description, explicitAgentId = null) {
   const assignee = explicitAgentId
     ? agents.find(a => a.id === explicitAgentId)
-    : pickBestAgent(description);
+    : agents.find(a => a.role === 'Script Writer');
   if (!assignee) return;
 
   let title = description.length > 45 ? description.slice(0, 42) + '...' : description;
@@ -1483,7 +1485,7 @@ async function createTask(description, explicitAgentId = null) {
   assignee.task = `Working: ${title.slice(0,30)}`;
 
   try {
-    const sys = `You are ${assignee.name}, ${assignee.role} at AgentCo. You just got assigned: "${title}". Acknowledge in 1 casual sentence, max 75 chars. Sound like yourself: ${assignee.personality}`;
+    const sys = `You are ${assignee.name}, ${assignee.role} on a YouTube content production team. You just got assigned: "${title}". Acknowledge in 1 casual sentence, max 75 chars. Sound like yourself: ${assignee.personality}`;
     const ack = (await claude(sys, 'Acknowledge:', 90)).trim().replace(/^"|"$/g, '');
     addBubble(assignee.id, ack, 7000);
   } catch (e) {
@@ -1504,9 +1506,9 @@ async function doTaskWork(agent, task) {
   const updateNum = task.updates.length + 1;
   const isLast = updateNum >= 4;
 
-  const sys = `You are ${agent.name}, ${agent.role} at AgentCo. Personality: ${agent.personality}
+  const sys = `You are ${agent.name}, ${agent.role} on a YouTube content production team. Personality: ${agent.personality}
 You are autonomously working on: "${task.description}"
-Generate update #${updateNum} of ~4. Be specific and realistic for your role.
+Generate update #${updateNum} of ~4. Be specific and realistic for your YouTube role.
 Previous updates: ${task.updates.length ? task.updates.join(' | ') : 'none yet'}
 ${isLast ? 'This is your FINAL update — wrap up and announce completion!' : 'Show meaningful progress.'}
 Max 100 chars. Plain text only.`;
@@ -1545,12 +1547,12 @@ async function agentThink(agent) {
     .map(a => a.name).join(', ') || 'nobody nearby';
   const locKeys = Object.keys(LOCS).join('|');
 
-  const sys = `You are ${agent.name}, ${agent.role} at AgentCo startup. Personality: ${agent.personality}
+  const sys = `You are ${agent.name}, ${agent.role} on a YouTube content production team. Personality: ${agent.personality}
 Respond ONLY with valid JSON (no other text):
 {"action":"move"|"say"|"work","location":"${locKeys}","message":"max 70 chars","task":"what you are doing"}
 - move: go somewhere (give location)
-- say: say something to nearby colleagues (give message)
-- work: stay at desk and work (give task description)
+- say: say something to nearby colleagues (give message, keep it on-topic for your YouTube role)
+- work: stay at desk and work (give task description relevant to your YouTube role)
 Nearby: ${nearby}. Current location: ${LOCS[agent.targetLocKey]?.label}. Status: ${agent.status}.
 Recent memory: ${agent.memory.slice(-3).join(' | ') || 'nothing'}.`;
 
@@ -1875,75 +1877,75 @@ async function stopVoice() {
 //  CHAT & TASK ROUTING
 // ═══════════════════════════════════════════════════════════
 
-const TASK_RE = /\b(research|implement|build|create|fix|test|design|investigate|analyze|review|write|document|check|explore|figure out|look into|make|develop|set up|configure|optimize)\b/i;
-
 async function sendMsg() {
-  const el = document.getElementById('chat-input');
+  const el  = document.getElementById('chat-input');
   const msg = el.value.trim();
   if (!msg || !simRunning) return;
   el.value = '';
 
+  // Slash commands: fast-path, no LLM
   if (msg === '/standup') { chatMsg('You', msg, '#cccfff', 'user'); doStandup(); return; }
   if (msg === '/break')   { chatMsg('You', msg, '#cccfff', 'user'); doBreak();   return; }
   if (msg === '/focus')   { chatMsg('You', msg, '#cccfff', 'user'); doFocus();   return; }
 
   chatMsg('You', msg, '#cccfff', 'user');
+  const thinkId = showThinking();
 
-  const maxAgent = agents.find(a => a.id === 'max');
-  if (maxAgent && FITNESS_RE.test(msg)) {
-    handleFitnessMessage(msg, maxAgent);
-    return;
+  try {
+    const r = await fetch('/api/plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg }),
+    });
+    const plan = await r.json();
+    if (plan.error) throw new Error(plan.error);
+    hideThinking(thinkId);
+    await executePlan(plan, msg);
+  } catch (e) {
+    hideThinking(thinkId);
+    sysMsg(`⚠️ Planner error: ${e.message}`);
   }
+}
 
-  // Primary: name at start — "Max, how are you?" or "max do this"
-  const nameMatch = msg.match(/^@?([A-Za-z]+)[,:\s]+(.{2,})$/i);
-  let namedAgent = nameMatch
-    ? agents.find(a => a.name.toLowerCase() === nameMatch[1].toLowerCase())
-    : null;
-  let namedRest = nameMatch?.[2]?.trim() || msg;
+async function executePlan(plan, msg) {
+  if (plan.directorMessage) sysMsg(`🎬 ${plan.directorMessage}`);
 
-  // Fallback: name appears anywhere — "hey Max how are you?" or "what's up Jordan"
-  if (!namedAgent) {
-    for (const ag of agents) {
-      if (new RegExp(`\\b${ag.name}\\b`, 'i').test(msg)) {
-        namedAgent = ag;
-        namedRest = msg;
+  for (const step of plan.steps) {
+    const agent = agents.find(a => a.id === step.agent);
+    if (!agent) { sysMsg(`⚠️ Unknown agent: ${step.agent}`); continue; }
+
+    const input = step.input || msg;
+
+    switch (step.skill) {
+      case 'fitness':
+        await handleFitnessMessage(input, agent);
+        break;
+
+      case 'task':
+        await createTask(input, agent.id);
+        break;
+
+      case 'chat': {
+        agent.remember(`Manager said to you: "${input}"`);
+        try {
+          const sys = `You are ${agent.name}, ${agent.role} on a YouTube content production team. `
+            + `Reply to your manager: 1-2 sentences, max 90 chars. `
+            + `Personality: ${agent.personality}. Currently: ${agent.task}.`;
+          const reply = (await claude(sys, input, 110)).trim().replace(/^"|"$/g, '');
+          addBubble(agent.id, reply, 7000);
+          chatMsg(agent.name, reply, agent.hue, 'agent');
+        } catch (e) {
+          sysMsg(`⚠️ ${agent.name}: ${e.message}`);
+          addBubble(agent.id, 'On it!', 3000);
+        }
         break;
       }
+
+      default:
+        // script, thumbnail, research, seo, repurpose, post
+        await handleSkillMessage(input, agent, step.skill);
     }
   }
-
-  if (namedAgent) {
-    if (TASK_RE.test(namedRest)) {
-      createTask(namedRest, namedAgent.id);
-    } else {
-      namedAgent.remember(`Manager said to you: "${namedRest}"`);
-      try {
-        const sys = `You are ${namedAgent.name}, ${namedAgent.role}. Reply to your manager: 1-2 sentences, max 90 chars. Personality: ${namedAgent.personality}. Currently: ${namedAgent.task}.`;
-        const reply = (await claude(sys, namedRest, 110)).trim().replace(/^"|"$/g,'');
-        addBubble(namedAgent.id, reply, 7000);
-        chatMsg(namedAgent.name, reply, namedAgent.hue, 'agent');
-      } catch (e) {
-        sysMsg(`⚠️ ${namedAgent.name} reply error: ${e.message}`);
-        addBubble(namedAgent.id, 'On it!', 3000);
-      }
-    }
-    return;
-  }
-
-  if (TASK_RE.test(msg)) {
-    createTask(msg);
-    return;
-  }
-
-  agents.forEach(ag => ag.remember(`Manager: "${msg}"`));
-  const responder = agents[Math.floor(Math.random() * agents.length)];
-  try {
-    const sys = `You are ${responder.name}, ${responder.role}. Reply casually to your manager, 1 sentence, max 75 chars. Personality: ${responder.personality}`;
-    const reply = (await claude(sys, msg, 90)).trim().replace(/^"|"$/g,'');
-    addBubble(responder.id, reply, 6000);
-    chatMsg(responder.name, reply, responder.hue, 'agent');
-  } catch { addBubble(responder.id, 'Heard!', 2000); }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1970,6 +1972,23 @@ function chatMsg(sender, text, color, type) {
   log.scrollTop = log.scrollHeight;
 }
 function sysMsg(t) { chatMsg('System', t, '#6666bb', 'system'); }
+
+function showThinking() {
+  const log = document.getElementById('chat-log');
+  const d = document.createElement('div');
+  d.className = 'chat-msg system';
+  const id = 'think_' + Date.now();
+  d.dataset.thinkId = id;
+  d.innerHTML = `<div class="msg-sender" style="color:#6666bb">Director</div>`
+    + `<div class="msg-text" style="display:flex;align-items:center;gap:8px;">Routing `
+    + `<span class="thinking-dots"><span></span><span></span><span></span></span></div>`;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+  return id;
+}
+function hideThinking(id) {
+  document.querySelector(`[data-think-id="${id}"]`)?.remove();
+}
 
 function switchTab(tab) {
   ['chat','tasks','fitness'].forEach(t => {
@@ -2046,7 +2065,6 @@ function setButtons(disabled) {
 //  FITNESS AGENT
 // ═══════════════════════════════════════════════════════════
 
-const FITNESS_RE = /\b(workout|ran|run|running|lifted|gym|weights|chest|legs|arms|shoulders|back|cardio|squat|bench|deadlift|pushup|pullup|miles|km|kilometer|sprint|jog|ate|eat|eaten|had|protein|calories|calorie|carbs|macros|meal|food|chicken|rice|eggs|oats|shake|nutrition|fitness|show.?grid|log|progress|diary|intake|burned|burned|macros|what.*i.*eat|how.*many.*cal|what.*did.*i|show.*my|today.*workout|workout.*today|how.*am.*i.*doing|did.*i.*eat|my.*food|my.*calories|my.*nutrition)\b/i;
 
 async function sendFitnessMsg() {
   const el = document.getElementById('fitness-input');
@@ -2118,6 +2136,38 @@ async function handleFitnessMessage(msg, maxAgent) {
   }
 
   maxAgent.isBusy = false;
+}
+
+async function handleSkillMessage(msg, agent, skillType) {
+  const deskKey = `desk_${agent.id}`;
+  if (LOCS[deskKey]) agent.goTo(deskKey);
+  agent.isBusy = true;
+  agent.status = 'working';
+  agent.task = `Running ${skillType}...`;
+  addBubble(agent.id, `Working on ${skillType}...`, 30000);
+  sysMsg(`⚙️ ${agent.name} started ${skillType}`);
+  switchTab('chat');
+
+  try {
+    const r = await fetch(`/api/skill/${skillType}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, agent: agent.id }),
+    });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    addBubble(agent.id, data.summary || '✅ Done!', 9000);
+    chatMsg(agent.name, data.summary || data.response, agent.hue, 'agent');
+    if (data.files && data.files.length) sysMsg(`📁 Saved: ${data.files.join(', ')}`);
+    sysMsg(`✅ ${agent.name} finished ${skillType}`);
+  } catch (e) {
+    sysMsg(`⚠️ ${agent.name} skill error: ${e.message}`);
+    addBubble(agent.id, "Hit a snag!", 4000);
+  }
+
+  agent.isBusy = false;
+  agent.status = 'idle';
+  agent.task = 'Idle';
 }
 
 async function refreshFitnessPanel() {
