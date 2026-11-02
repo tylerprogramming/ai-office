@@ -10,7 +10,7 @@ const app = express();
 app.use(express.json({ limit: '20kb' }));
 app.use(express.static(path.join(__dirname)));
 
-const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const MODEL = process.env.OPENAI_MODEL || 'gpt-5.4-mini';
 
 // Key priority: .env → in-memory (set via /api/setkey)
 let ENV_KEY = process.env.OPENAI_API_KEY || '';
