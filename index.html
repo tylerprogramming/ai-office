@@ -1123,7 +1123,7 @@ function render() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  CLAUDE API (via backend)
+//  LLM API (via backend /api/chat -> OpenAI Chat Completions)
 // ═══════════════════════════════════════════════════════════
 
 async function claude(system, user, maxTokens = 200) {
@@ -1930,10 +1930,10 @@ function showKeyOverlay() {
     <div style="background:#12122a;border:1px solid #3a3a7a;border-radius:14px;padding:36px 40px;text-align:center;max-width:440px;width:90%">
       <div style="color:#8888ff;font-size:18px;font-weight:bold;letter-spacing:2px;margin-bottom:10px">AGENT HQ</div>
       <p style="font-size:13px;opacity:0.6;margin-bottom:20px;line-height:1.5">
-        Enter your Anthropic API key to start.<br>
+        Enter your OpenAI API key to start.<br>
         <span style="opacity:0.5;font-size:11px">Key is stored server-side only — never persisted to disk.</span>
       </p>
-      <input id="key-input" type="password" placeholder="sk-ant-..."
+      <input id="key-input" type="password" placeholder="sk-..."
         style="width:100%;background:#1a1a35;border:1px solid #3a3a7a;border-radius:7px;color:#e0e0e0;padding:11px 13px;font-size:13px;font-family:inherit;outline:none;margin-bottom:12px"
         onkeydown="if(event.key==='Enter')submitKey()" />
       <button onclick="submitKey()"
@@ -1951,8 +1951,8 @@ async function submitKey() {
   const input = document.getElementById('key-input');
   const errEl = document.getElementById('key-error');
   const key = input?.value.trim();
-  if (!key || !key.startsWith('sk-')) {
-    if (errEl) { errEl.textContent = 'Key must start with sk-'; errEl.style.display = 'block'; }
+  if (!key || !key.startsWith('sk-') || key.startsWith('sk-ant-')) {
+    if (errEl) { errEl.textContent = 'Enter an OpenAI key (sk-...), not an Anthropic key'; errEl.style.display = 'block'; }
     return;
   }
   try {

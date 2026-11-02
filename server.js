@@ -10,7 +10,7 @@ const app = express();
 app.use(express.json({ limit: '20kb' }));
 app.use(express.static(path.join(__dirname)));
 
-const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const MODEL = process.env.OPENAI_MODEL || 'gpt-5.4-mini';
 
 // Key priority: .env → in-memory (set via /api/setkey)
 let ENV_KEY = process.env.OPENAI_API_KEY || '';
@@ -20,7 +20,9 @@ const getKey = () => ENV_KEY || MEM_KEY;
 // One-time key setup from browser (stored in memory only, never on disk)
 app.post('/api/setkey', (req, res) => {
   const { key } = req.body;
-  if (!key || !key.startsWith('sk-')) return res.status(400).json({ error: 'Invalid key format' });
+  if (!key || !key.startsWith('sk-') || key.startsWith('sk-ant-')) {
+    return res.status(400).json({ error: 'Expected an OpenAI API key (sk-...); Anthropic keys (sk-ant-...) do not work here' });
+  }
   MEM_KEY = key;
   console.log('✅  API key set via browser (in-memory)');
   res.json({ ok: true });
@@ -32,7 +34,7 @@ app.get('/api/status', (req, res) => {
 
 app.post('/api/chat', async (req, res) => {
   const key = getKey();
-  if (!key) return res.status(401).json({ error: 'No API key. Use /api/setkey or set ANTHROPIC_API_KEY in .env' });
+  if (!key) return res.status(401).json({ error: 'No API key. Use /api/setkey or set OPENAI_API_KEY in .env' });
 
   const { system, user, maxTokens = 250 } = req.body;
   if (!system || !user) return res.status(400).json({ error: 'Missing system or user' });
